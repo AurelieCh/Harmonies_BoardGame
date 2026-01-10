@@ -1,6 +1,7 @@
 package com.common_game.models;
 
 import com.common_game.cards.AnimalCard;
+import com.common_game.decks.AnimalDeck;
 import com.common_game.decks.Position;
 import com.common_game.decks.TerrainDeck;
 import com.common_game.rules.BirdRule;
@@ -35,45 +36,75 @@ public class Game {
         this.players = players;
         this.currentPlayerIndex = 0;
         this.terrainDeck = new TerrainDeck();
-        this.availableAnimalCards = new ArrayList<>(List.of(
-                new AnimalCard(UUID.randomUUID(), AnimalType.DEER, 3, new DeerRule(), List.of(TerrainType.FOREST), 1, 2),
-                new AnimalCard(UUID.randomUUID(), AnimalType.FOX, 2, new FoxRule(), List.of(TerrainType.MOUNTAIN, TerrainType.FOREST), 2, 1),
-                new AnimalCard(UUID.randomUUID(), AnimalType.BIRD, 2, new BirdRule(), List.of(TerrainType.WATER), 1, 1),
-                new AnimalCard(UUID.randomUUID(), AnimalType.FISH, 2, new FishRule(), List.of(TerrainType.WATER), 1, 1)
-        ));
+        this.availableAnimalCards = new AnimalDeck().getCards();
         this.boards = players.stream().collect(Collectors.toMap(Player::getId, p -> new Board()));
     }
 
-    /**
-     * Method capable to play a turn of the game for one player
-     * @param playerId The UUID of the player
-     * @param position Position where the player want to place the tile
-     */
-    public void playTurn(UUID playerId, Position position) {
-        // 1. Checks
+    // First step : Draw a card
+    public TerrainTile drawTile(UUID playerId) {
         if (status != GameStatus.IN_PROGRESS) {
             throw new GameException(ErrorCode.GAME_NOT_STARTED, "Game is not in progress");
         }
-        Player currentPlayer = players.get(currentPlayerIndex);
+        Player currentPlayer = getCurrentPlayer();
+        if (!currentPlayer.getId().equals(playerId)) {
+            throw new GameException(ErrorCode.NOT_YOUR_TURN, "It's not your turn");
+        }
+        if (terrainDeck.isEmpty()) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "No more terrain tiles available");
+        }
+        return terrainDeck.draw(); // Pioche une tuile du deck initialisé
+    }
+
+    // Second step : Place the tile
+    public void placeTile(UUID playerId, Position position, TerrainType tileType) {
+        if (status != GameStatus.IN_PROGRESS) {
+            throw new GameException(ErrorCode.GAME_NOT_STARTED, "Game is not in progress");
+        }
+        Player currentPlayer = getCurrentPlayer();
         if (!currentPlayer.getId().equals(playerId)) {
             throw new GameException(ErrorCode.NOT_YOUR_TURN, "It's not your turn");
         }
 
-        // 2. Place the tile
-        TerrainTile tile = terrainDeck.draw();
+        // Vérifie que la tuile correspond à celle piochée
         Board board = boards.get(playerId);
-        board.placeTile(position, tile);
+        board.placeTile(position, new TerrainTile(tileType));
 
-        // 3. check the habitat rules for ALL animal cards of the player
-        for (AnimalCard card : currentPlayer.getAnimalCards()) {
+        // Vérifie les règles d'habitat pour les cartes animales
+        checkAnimalCards(playerId, position);
+
+        // Passe au joueur suivant
+        nextTurn();
+    }
+
+    // Méthode pour vérifier les cartes animales
+    private void checkAnimalCards(UUID playerId, Position position) {
+        Player player = getPlayerById(playerId);
+        Board board = boards.get(playerId);
+
+        for (AnimalCard card : player.getAnimalCards()) {
             if (!card.isComplete() && card.getRule().isSatisfied(board, position)) {
                 board.placeAnimalCube(position, card.getType());
                 card.incrementPlacedCubes();
-                currentPlayer.addPoints(card.getPoints());
+                player.addPoints(card.getPoints());
             }
         }
+    }
 
-        // 4. Next player turn
+    // Helper pour obtenir le joueur actuel
+    private Player getCurrentPlayer() {
+        return players.get(currentPlayerIndex);
+    }
+
+    // Helper pour obtenir un joueur par ID
+    private Player getPlayerById(UUID playerId) {
+        return players.stream()
+                .filter(p -> p.getId().equals(playerId))
+                .findFirst()
+                .orElseThrow(() -> new GameException(ErrorCode.INVALID_MOVE, "Player not found"));
+    }
+
+    // Méthode pour passer au tour suivant
+    private void nextTurn() {
         currentPlayerIndex = (currentPlayerIndex + 1) % players.size();
     }
 
