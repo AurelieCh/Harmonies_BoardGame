@@ -4,11 +4,6 @@ import com.common_game.cards.AnimalCard;
 import com.common_game.decks.AnimalDeck;
 import com.common_game.decks.Position;
 import com.common_game.decks.TerrainDeck;
-import com.common_game.rules.BirdRule;
-import com.common_game.rules.DeerRule;
-import com.common_game.rules.FishRule;
-import com.common_game.rules.FoxRule;
-import com.enums.AnimalType;
 import com.enums.ErrorCode;
 import com.enums.GameStatus;
 import com.enums.TerrainType;
@@ -16,7 +11,9 @@ import com.exceptions.GameException;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Getter
@@ -52,7 +49,7 @@ public class Game {
         if (terrainDeck.isEmpty()) {
             throw new GameException(ErrorCode.INVALID_MOVE, "No more terrain tiles available");
         }
-        return terrainDeck.draw(); // Pioche une tuile du deck initialisé
+        return terrainDeck.draw();
     }
 
     // Second step : Place the tile
