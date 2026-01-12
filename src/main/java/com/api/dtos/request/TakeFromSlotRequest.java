@@ -1,15 +1,17 @@
-package com.api.dtos.response;
+package com.api.dtos.request;
 
-import com.enums.TerrainType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.UUID;
+
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class DrawnTileResponse {
-    private TerrainType tileType;
+public class TakeFromSlotRequest {
+    private int slotNumber;
+    private UUID playerUUID;
 }

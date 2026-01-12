@@ -1,20 +1,17 @@
 package com.api.controllers;
 
-import com.api.dtos.ApiError;
-import com.api.dtos.request.*;
-import com.api.dtos.response.DrawnTileResponse;
+import com.api.dtos.request.CreatePlayerRequest;
+import com.api.dtos.request.PlaceAnimalCubeRequest;
+import com.api.dtos.request.PlaceTilesRequest;
+import com.api.dtos.request.TakeFromSlotRequest;
 import com.api.dtos.response.DrawnTilesResponse;
 import com.api.dtos.response.GameStateResponse;
 import com.api.storages.GameStorage;
 import com.common_game.cards.AnimalCard;
-import com.common_game.models.Board;
 import com.common_game.models.Game;
 import com.common_game.models.Player;
-import com.common_game.models.TerrainTile;
 import com.enums.AnimalType;
-import com.enums.ErrorCode;
 import com.enums.TerrainType;
-import com.exceptions.GameException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -48,42 +45,13 @@ public class GameController {
         return ResponseEntity.ok(mapToGameStateResponse(game));
     }
 
-    @PostMapping("/{gameId}/draw-tile")
-    public ResponseEntity<?> drawTile(@PathVariable UUID gameId, @RequestBody UUID playerId) {
-        try {
-            Game game = gameStorage.findById(gameId);
-            TerrainTile tile = game.drawTile(playerId);
-            return ResponseEntity.ok(new DrawnTileResponse(tile.getType()));
-        } catch (GameException e) {
-            return ResponseEntity.badRequest().body(new ApiError(e.getErrorCode(), e.getMessage()));
-        } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body(new ApiError(ErrorCode.INVALID_MOVE, "No more terrain tiles available"));
-        }
-    }
-
-    @PostMapping("/{gameId}/draw-three-tiles")
-    public ResponseEntity<DrawnTilesResponse> drawThreeTiles(@PathVariable UUID gameId) {
-        Game game = gameStorage.findById(gameId);
-        List<TerrainTile> tiles = game.drawThreeTiles();
-        return ResponseEntity.ok(new DrawnTilesResponse(tiles.stream().map(TerrainTile::getType).collect(Collectors.toList())));
-    }
-
     @PostMapping("/{gameId}/take-from-slot")
     public ResponseEntity<DrawnTilesResponse> takeFromSlot(
             @PathVariable UUID gameId,
-            @RequestBody Map<String, Integer> request) { // {"slotNumber": 1}
+            @RequestBody TakeFromSlotRequest request) {
         Game game = gameStorage.findById(gameId);
-        List<TerrainTile> tiles = game.takeTilesFromCentralBoard(request.get("slotNumber"));
-        return ResponseEntity.ok(new DrawnTilesResponse(tiles.stream().map(TerrainTile::getType).collect(Collectors.toList())));
-    }
-
-    @PostMapping("/{gameId}/place-tile")
-    public ResponseEntity<GameStateResponse> placeTile(
-            @PathVariable UUID gameId,
-            @RequestBody PlaceTileRequest request) {
-        Game game = gameStorage.findById(gameId);
-        game.placeTile(request.getPlayerId(), request.getPosition(), request.getTileType());
-        return ResponseEntity.ok(mapToGameStateResponse(game));
+        DrawnTilesResponse response = game.takeTilesFromCentralBoard(request.getPlayerUUID(), request.getSlotNumber());
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{gameId}/place-tiles")
@@ -93,17 +61,8 @@ public class GameController {
 
         Game game = gameStorage.findById(gameId);
         UUID currentPlayerId = game.getCurrentPlayer().getId();
-        Board playerBoard = game.getBoards().get(currentPlayerId);
 
-        // Check the number of tiles and their position
-        if (request.getTiles().size() != request.getPositions().size()) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "Tiles and positions count mismatch");
-        }
-
-        // Place each tile
-        for (int i = 0; i < request.getTiles().size(); i++) {
-            playerBoard.placeTile(request.getPositions().get(i), new TerrainTile(request.getTiles().get(i)));
-        }
+        game.placeTiles(currentPlayerId, request.getTilePlacements(), request.getSlotNumber());
 
         return ResponseEntity.ok(mapToGameStateResponse(game));
     }

@@ -1,5 +1,6 @@
 package com.common_game.models;
 
+import com.api.dtos.response.DrawnTilesResponse;
 import com.common_game.cards.AnimalCard;
 import com.common_game.decks.AnimalDeck;
 import com.common_game.decks.Position;
@@ -24,6 +25,8 @@ public class Game {
     private GameStatus status;
     private List<Player> players;
     private UUID currentPlayerUUID;
+    private Integer slotNumberToRefill;
+    private List<TerrainType> tilesToPlace;
     private TerrainDeck terrainDeck;
     private List<AnimalCard> availableAnimalCards;
     private Map<UUID, Board> boards;
@@ -45,78 +48,72 @@ public class Game {
     }
 
     /**
-     * Method to draw a tile for a player
-     * @param playerId Player's UUID
-     * @return The terrain tile drawn by the player
-     */
-    public TerrainTile drawTile(UUID playerId) {
-        if (status != GameStatus.IN_PROGRESS) {
-            throw new GameException(ErrorCode.GAME_NOT_STARTED, "Game is not in progress");
-        }
-        Player currentPlayer = getCurrentPlayer();
-        if (!currentPlayer.getId().equals(playerId)) {
-            throw new GameException(ErrorCode.NOT_YOUR_TURN, "It's not your turn");
-        }
-        if (terrainDeck.isEmpty()) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "No more terrain tiles available");
-        }
-        return terrainDeck.draw();
-    }
-
-    /**
-     * Method to draw three tiles
-     * @return A List of terrain tiles
-     */
-    public List<TerrainTile> drawThreeTiles() {
-        List<TerrainTile> drawnTiles = new ArrayList<>();
-        for (int i = 0; i < 3; i++) {
-            if (terrainDeck.isEmpty()) {
-                break;  // Arrête si le deck est vide
-            }
-            drawnTiles.add(terrainDeck.draw());
-        }
-        return drawnTiles;
-    }
-
-    /**
      * Method to draw tiles from the central board
      * @param slotNumber Slot number where the player want to pick the tiles
      * @return A List of terrain tiles taken from the central board slot number slotNumber
      */
-    public List<TerrainTile> takeTilesFromCentralBoard(int slotNumber) {
-        List<TerrainTile> tiles = centralBoard.takeTilesFromSlot(slotNumber);
-        if (terrainDeck.isEmpty()) {
-            throw new GameException(ErrorCode.GAME_OVER, "No more tiles in the bag");
+    public DrawnTilesResponse takeTilesFromCentralBoard(UUID playerId, int slotNumber) {
+        // 1. Vérifications de base
+        if (!currentPlayerUUID.equals(playerId)) {
+            throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
         }
-        centralBoard.refillSlot(slotNumber, terrainDeck);
-        return tiles;
+        if (status != GameStatus.IN_PROGRESS) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "Game not started");
+        }
+
+        // 2. Pioche les 3 jetons de l'emplacement
+        List<TerrainTile> tiles = centralBoard.takeTilesFromSlot(slotNumber);
+
+        // 3. Stocke les types de jetons et le numéro de l'emplacement
+        tilesToPlace = tiles.stream().map(TerrainTile::getType).collect(Collectors.toList());
+        this.slotNumberToRefill = slotNumber; // Ajoute ce champ dans `Game` pour mémoriser l'emplacement
+
+        // 4. Passe en mode "attente de placement"
+        status = GameStatus.WAITING_FOR_PLACEMENT;
+
+        // 5. Retourne les types de jetons piochés
+        return new DrawnTilesResponse(tilesToPlace);
     }
 
     /**
      * Method that allows a player to place a tile at a position
      * @param playerId Player's UUID
-     * @param position Position where the player want to place the tile
-     * @param tileType Tile type's
+     * @param tilePlacements Position where the player want to place the tiles
+     * @param slotNumber Number of the slot to refill
      */
-    public void placeTile(UUID playerId, Position position, TerrainType tileType) {
-        if (status != GameStatus.IN_PROGRESS) {
-            throw new GameException(ErrorCode.GAME_NOT_STARTED, "Game is not in progress");
+    public void placeTiles(UUID playerId, Map<Position, TerrainType> tilePlacements, int slotNumber) {
+        // 1. Vérifications de base
+        if (!currentPlayerUUID.equals(playerId)) {
+            throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
         }
-        Player currentPlayer = getCurrentPlayer();
-        if (!currentPlayer.getId().equals(playerId)) {
-            throw new GameException(ErrorCode.NOT_YOUR_TURN, "It's not your turn");
+        if (status != GameStatus.WAITING_FOR_PLACEMENT) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "You must draw tiles first");
+        }
+        if (tilePlacements.size() != tilesToPlace.size()) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "You must place all 3 tiles");
         }
 
-        // check to assert that the tile is the same type as the one drawn
+        // 2. Vérifie que les types de tuiles correspondent à ceux piochés
+        List<TerrainType> placedTypes = new ArrayList<>(tilePlacements.values());
+        if (!new HashSet<>(placedTypes).containsAll(tilesToPlace) || !new HashSet<>(tilesToPlace).containsAll(placedTypes)) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "Tile types do not match drawn tiles");
+        }
+
+        // 3. Place les tuiles sur le plateau
         Board board = boards.get(playerId);
-        board.placeTile(position, new TerrainTile(tileType));
+        for (Map.Entry<Position, TerrainType> entry : tilePlacements.entrySet()) {
+            board.placeTile(entry.getKey(), new TerrainTile(entry.getValue()));
+        }
 
-        // Check habitat rules for animals
-        checkAnimalCards(playerId, position);
+        // 4. Recharge l'emplacement du plateau central
+        centralBoard.refillSlot(slotNumber, terrainDeck);
 
         // Next player's turn
         nextTurn();
+        status = GameStatus.IN_PROGRESS;
+        tilesToPlace = null;
     }
+
 
     /**
      * Method to check animal cards

@@ -5,12 +5,12 @@ import com.enums.TerrainType;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
 public class PlaceTilesRequest {
-    private List<TerrainType> tiles;
-    private List<Position> positions;
+    private Map<Position, TerrainType> tilePlacements; // {"x":0,"y":0": "FOREST"}
+    private int slotNumber; // Number of the slot to refill
 }
 
