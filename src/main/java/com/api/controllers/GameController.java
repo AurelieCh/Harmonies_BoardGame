@@ -2,17 +2,21 @@ package com.api.controllers;
 
 import com.api.dtos.request.CreatePlayerRequest;
 import com.api.dtos.request.PlaceAnimalCubeRequest;
-import com.api.dtos.request.PlaceTilesRequest;
 import com.api.dtos.request.TakeFromSlotRequest;
+import com.api.dtos.request.TilesPlacementRequest;
 import com.api.dtos.response.DrawnTilesResponse;
 import com.api.dtos.response.GameStateResponse;
+import com.api.dtos.response.RemainingCardsResponse;
+import com.api.dtos.response.ScoresResponse;
 import com.api.storages.GameStorage;
 import com.common_game.cards.AnimalCard;
+import com.common_game.decks.Position;
 import com.common_game.models.Game;
 import com.common_game.models.Player;
 import com.enums.AnimalType;
 import com.enums.TerrainType;
-import org.springframework.http.ResponseEntity;
+import com.exceptions.GameNotFoundException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -23,108 +27,150 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/game")
+@RequiredArgsConstructor
 public class GameController {
-
-    // TODO Remplacer par un stockage en BDD propre maybe
-    private final GameStorage gameStorage = new GameStorage();
+    private final GameStorage gameStorage;
 
     @PostMapping("/create")
-    public ResponseEntity<GameStateResponse> createGame(@RequestBody List<CreatePlayerRequest> playersRequest) {
+    public GameStateResponse createGame(@RequestBody List<CreatePlayerRequest> playersRequest) {
+
         List<Player> players = playersRequest.stream()
-                .map(request -> new Player(UUID.randomUUID(), request.getName(), request.getWaterFaceType()))
-                .collect(Collectors.toList());
+                .map(req -> new Player(UUID.randomUUID(), req.getName(), req.getWaterFaceType()))
+                .toList();
+
         Game game = new Game(players);
         gameStorage.save(game);
-        return ResponseEntity.ok(mapToGameStateResponse(game));
+
+        return mapToGameStateResponse(game);
     }
 
     @PostMapping("/{gameId}/start")
-    public ResponseEntity<GameStateResponse> startGame(@PathVariable UUID gameId) {
-        Game game = gameStorage.findById(gameId);
+    public GameStateResponse startGame(@PathVariable UUID gameId) {
+        Game game = getGameOrThrow(gameId);
         game.start();
-        return ResponseEntity.ok(mapToGameStateResponse(game));
+        return mapToGameStateResponse(game);
     }
 
     @PostMapping("/{gameId}/take-from-slot")
-    public ResponseEntity<DrawnTilesResponse> takeFromSlot(
+    public DrawnTilesResponse takeFromSlot(
             @PathVariable UUID gameId,
             @RequestBody TakeFromSlotRequest request) {
-        Game game = gameStorage.findById(gameId);
-        DrawnTilesResponse response = game.takeTilesFromCentralBoard(request.getPlayerUUID(), request.getSlotNumber());
-        return ResponseEntity.ok(response);
+
+        Game game = getGameOrThrow(gameId);
+        return game.takeTilesFromCentralBoard(
+                request.getPlayerUUID(),
+                request.getSlotNumber()
+        );
     }
 
     @PostMapping("/{gameId}/place-tiles")
-    public ResponseEntity<GameStateResponse> placeTiles(
+    public GameStateResponse placeTiles(
             @PathVariable UUID gameId,
-            @RequestBody PlaceTilesRequest request) {
+            @RequestBody List<TilesPlacementRequest> request) {
 
-        Game game = gameStorage.findById(gameId);
-        UUID currentPlayerId = game.getCurrentPlayer().getId();
+        Game game = getGameOrThrow(gameId);
 
-        game.placeTiles(currentPlayerId, request.getTilePlacements(), request.getSlotNumber());
+        // Conversion List → Map
+        Map<Position, TerrainType> tileMap = request
+                .stream()
+                .collect(Collectors.toMap(
+                        TilesPlacementRequest::getPosition,
+                        TilesPlacementRequest::getTerrainType
+                ));
 
-        return ResponseEntity.ok(mapToGameStateResponse(game));
+        game.placeTiles(game.getCurrentPlayer().getId(), tileMap);
+
+        return mapToGameStateResponse(game);
     }
 
+
     @GetMapping("/{gameId}/available-animal-cards")
-    public ResponseEntity<List<AnimalCard>> getAvailableAnimalCards(@PathVariable UUID gameId) {
-        Game game = gameStorage.findById(gameId);
-        return ResponseEntity.ok(game.getAvailableAnimalCards().stream().limit(5).collect(Collectors.toList()));
+    public List<AnimalCard> getAvailableAnimalCards(@PathVariable UUID gameId) {
+        Game game = getGameOrThrow(gameId);
+        return game.getAvailableAnimalCards().stream().limit(5).toList();
     }
 
     @PostMapping("/{gameId}/take-animal-card")
-    public ResponseEntity<GameStateResponse> takeAnimalCard(
+    public GameStateResponse takeAnimalCard(
             @PathVariable UUID gameId,
-            @RequestBody Map<String, AnimalType> request) { // {"animalType": "DEER"}
-        Game game = gameStorage.findById(gameId);
-        game.takeAnimalCard(game.getCurrentPlayer().getId(), request.get("animalType"));
-        return ResponseEntity.ok(mapToGameStateResponse(game));
+            @RequestBody Map<String, AnimalType> request) {
+
+        Game game = getGameOrThrow(gameId);
+        game.takeAnimalCard(
+                game.getCurrentPlayer().getId(),
+                request.get("animalType")
+        );
+
+        return mapToGameStateResponse(game);
     }
 
     @PostMapping("/{gameId}/place-animal-cube")
-    public ResponseEntity<GameStateResponse> placeAnimalCube(
+    public GameStateResponse placeAnimalCube(
             @PathVariable UUID gameId,
-            @RequestBody PlaceAnimalCubeRequest request) { // {"animalType": "DEER", "position": {...}}
-        Game game = gameStorage.findById(gameId);
-        game.placeAnimalCube(game.getCurrentPlayer().getId(), request.getPosition(), request.getAnimalType());
-        return ResponseEntity.ok(mapToGameStateResponse(game));
+            @RequestBody PlaceAnimalCubeRequest request) {
+
+        Game game = getGameOrThrow(gameId);
+        game.placeAnimalCube(
+                game.getCurrentPlayer().getId(),
+                request.getPosition(),
+                request.getAnimalType()
+        );
+
+        return mapToGameStateResponse(game);
     }
 
-    @GetMapping("/{gameId}/acutal_scores")
-    public ResponseEntity<Map<UUID, Integer>> getScores(@PathVariable UUID gameId) {
-        Game game = gameStorage.findById(gameId);
-        return ResponseEntity.ok(game.calculateScores());
+    @GetMapping("/{gameId}/actual_scores")
+    public List<ScoresResponse> getScores(@PathVariable UUID gameId) {
+        return getGameOrThrow(gameId).calculateScores();
     }
 
-
-    @GetMapping("/{gameId}/end_scores")
-    public ResponseEntity<Integer> calculateScore(
+    @GetMapping("/{gameId}/end-scores")
+    public int calculateFinalScore(
             @PathVariable UUID gameId,
             @RequestParam UUID playerId,
             @RequestParam boolean isWaterFaceA) {
-        Game game = gameStorage.findById(gameId);
-        int score = game.calculateFinalScore(playerId, isWaterFaceA);
-        return ResponseEntity.ok(score);
+
+        return getGameOrThrow(gameId)
+                .calculateFinalScore(playerId, isWaterFaceA);
     }
 
     @GetMapping("/{gameId}")
-    public ResponseEntity<GameStateResponse> getGameState(@PathVariable UUID gameId) {
-        Game game = gameStorage.findById(gameId);
-        return ResponseEntity.ok(mapToGameStateResponse(game));
+    public GameStateResponse getGameState(@PathVariable UUID gameId) {
+        return mapToGameStateResponse(getGameOrThrow(gameId));
+    }
+
+    @GetMapping
+    public List<GameStateResponse> getGames() {
+        return gameStorage.getGames().stream()
+                .map(this::mapToGameStateResponse)
+                .toList();
     }
 
     @GetMapping("/{gameId}/central-board")
-    public ResponseEntity<Map<Integer, List<TerrainType>>> getCentralBoard(@PathVariable UUID gameId) {
-        Game game = gameStorage.findById(gameId);
-        Map<Integer, List<TerrainType>> centralBoardState = new HashMap<>();
+    public Map<Integer, List<TerrainType>> getCentralBoard(@PathVariable UUID gameId) {
+
+        Game game = getGameOrThrow(gameId);
+        Map<Integer, List<TerrainType>> board = new HashMap<>();
+
         for (int i = 1; i <= 5; i++) {
-            centralBoardState.put(i, game.getCentralBoard().getSlotTiles(i));
+            board.put(i, game.getCentralBoard().getSlotTiles(i));
         }
-        return ResponseEntity.ok(centralBoardState);
+
+        return board;
     }
 
-    // Helper : Convertir Game en GameStateResponse
+    @GetMapping("/{gameId}/remaining-tiles")
+    public RemainingCardsResponse getRemainingTiles(@PathVariable UUID gameId) {
+
+        Game game = getGameOrThrow(gameId);
+        return new RemainingCardsResponse(
+                game.getTerrainDeck().getTiles().size(),
+                game.getTerrainDeck().getTiles()
+        );
+    }
+
+    // -------- Mapping --------
+
     private GameStateResponse mapToGameStateResponse(Game game) {
         GameStateResponse response = new GameStateResponse();
         response.setGameId(game.getId());
@@ -133,4 +179,10 @@ public class GameController {
         response.setCurrentPlayerUUID(game.getCurrentPlayerUUID());
         return response;
     }
+
+    private Game getGameOrThrow(UUID gameId) {
+        return gameStorage.findById(gameId)
+                .orElseThrow(() -> new GameNotFoundException(gameId.toString()));
+    }
 }
+

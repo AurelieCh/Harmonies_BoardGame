@@ -1,6 +1,7 @@
 package com.common_game.models;
 
 import com.api.dtos.response.DrawnTilesResponse;
+import com.api.dtos.response.ScoresResponse;
 import com.common_game.cards.AnimalCard;
 import com.common_game.decks.AnimalDeck;
 import com.common_game.decks.Position;
@@ -53,7 +54,7 @@ public class Game {
      * @return A List of terrain tiles taken from the central board slot number slotNumber
      */
     public DrawnTilesResponse takeTilesFromCentralBoard(UUID playerId, int slotNumber) {
-        // 1. Vérifications de base
+        // Checks
         if (!currentPlayerUUID.equals(playerId)) {
             throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
         }
@@ -61,17 +62,17 @@ public class Game {
             throw new GameException(ErrorCode.INVALID_MOVE, "Game not started");
         }
 
-        // 2. Pioche les 3 jetons de l'emplacement
+        // Draw 3 tiles
         List<TerrainTile> tiles = centralBoard.takeTilesFromSlot(slotNumber);
 
-        // 3. Stocke les types de jetons et le numéro de l'emplacement
+        // Store tiles type
         tilesToPlace = tiles.stream().map(TerrainTile::getType).collect(Collectors.toList());
-        this.slotNumberToRefill = slotNumber; // Ajoute ce champ dans `Game` pour mémoriser l'emplacement
+        this.slotNumberToRefill = slotNumber;
 
-        // 4. Passe en mode "attente de placement"
+        // Mod WAITING
         status = GameStatus.WAITING_FOR_PLACEMENT;
 
-        // 5. Retourne les types de jetons piochés
+        // Return drawn tiles
         return new DrawnTilesResponse(tilesToPlace);
     }
 
@@ -79,10 +80,9 @@ public class Game {
      * Method that allows a player to place a tile at a position
      * @param playerId Player's UUID
      * @param tilePlacements Position where the player want to place the tiles
-     * @param slotNumber Number of the slot to refill
      */
-    public void placeTiles(UUID playerId, Map<Position, TerrainType> tilePlacements, int slotNumber) {
-        // 1. Vérifications de base
+    public void placeTiles(UUID playerId, Map<Position, TerrainType> tilePlacements) {
+        // Checks
         if (!currentPlayerUUID.equals(playerId)) {
             throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
         }
@@ -93,44 +93,26 @@ public class Game {
             throw new GameException(ErrorCode.INVALID_MOVE, "You must place all 3 tiles");
         }
 
-        // 2. Vérifie que les types de tuiles correspondent à ceux piochés
+        // Checks that places tiles are the drawn type
         List<TerrainType> placedTypes = new ArrayList<>(tilePlacements.values());
         if (!new HashSet<>(placedTypes).containsAll(tilesToPlace) || !new HashSet<>(tilesToPlace).containsAll(placedTypes)) {
             throw new GameException(ErrorCode.INVALID_MOVE, "Tile types do not match drawn tiles");
         }
 
-        // 3. Place les tuiles sur le plateau
+        // Place tile on the board
         Board board = boards.get(playerId);
         for (Map.Entry<Position, TerrainType> entry : tilePlacements.entrySet()) {
             board.placeTile(entry.getKey(), new TerrainTile(entry.getValue()));
         }
 
-        // 4. Recharge l'emplacement du plateau central
-        centralBoard.refillSlot(slotNumber, terrainDeck);
+        // Refill central board
+        centralBoard.refillSlot(this.slotNumberToRefill);
+        this.slotNumberToRefill = null;
 
         // Next player's turn
         nextTurn();
         status = GameStatus.IN_PROGRESS;
         tilesToPlace = null;
-    }
-
-
-    /**
-     * Method to check animal cards
-     * @param playerId UUID of the player we want to check
-     * @param position At the position we want to check
-     */
-    private void checkAnimalCards(UUID playerId, Position position) {
-        Player player = getPlayerById(playerId);
-        Board board = boards.get(playerId);
-
-        for (AnimalCard card : player.getAnimalCards()) {
-            if (!card.isComplete() && card.getRule().isSatisfied(board, position)) {
-                board.placeAnimalCube(position, card.getType());
-                card.incrementPlacedCubes();
-                player.addPoints(card.getPoints());
-            }
-        }
     }
 
     public void placeAnimalCube(UUID playerId, Position position, AnimalType animalType) {
@@ -244,8 +226,8 @@ public class Game {
         return isTerrainDeckEmpty || anyPlayerBoardAlmostFull;
     }
 
-    public Map<UUID, Integer> calculateScores() {
-        Map<UUID, Integer> scores = new HashMap<>();
+    public List<ScoresResponse> calculateScores() {
+        List<ScoresResponse> scores = new ArrayList<>();
         for (Map.Entry<UUID, Board> entry : boards.entrySet()) {
             UUID playerId = entry.getKey();
             Board board = entry.getValue();
@@ -261,7 +243,8 @@ public class Game {
                             .mapToInt(AnimalCard::getPoints)
                             .sum())
                     .orElse(0);
-            scores.put(playerId, landscapePoints + animalPoints);
+            ScoresResponse scoresResponse = new ScoresResponse(this.getPlayerById(playerId).getName(), playerId, landscapePoints + animalPoints);
+            scores.add(scoresResponse);
         }
         return scores;
     }

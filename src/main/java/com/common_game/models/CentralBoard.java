@@ -9,11 +9,13 @@ import java.util.stream.IntStream;
 
 public class CentralBoard {
     private final Map<Integer, List<TerrainTile>> slots; // 5 emplacements (1 à 5)
+    private final TerrainDeck deck;
 
     public CentralBoard(TerrainDeck deck) {
+        this.deck = deck;
         this.slots = new HashMap<>();
         for (int i = 1; i <= 5; i++) {
-            this.slots.put(i, IntStream.range(0, 3).mapToObj(j -> deck.draw()).collect(Collectors.toList()));
+            slots.put(i, drawInitialTiles());
         }
     }
 
@@ -43,10 +45,19 @@ public class CentralBoard {
     /**
      * Method to refill a slot of the central board at the position slotNumber
      * @param slotNumber Position of the slot where we want to refill
-     * @param deck The terrain deck to draw only available cards
      */
-    public void refillSlot(int slotNumber, TerrainDeck deck) {
-        slots.put(slotNumber, IntStream.range(0, 3).mapToObj(j -> deck.draw()).collect(Collectors.toList()));
+    public void refillSlot(int slotNumber) {
+        if (deck.isEmpty()) {
+            slots.put(slotNumber, Collections.emptyList()); // Ne recharge pas si le sac est vide
+        } else {
+            slots.put(slotNumber, drawInitialTiles());
+        }
+    }
+
+    private List<TerrainTile> drawInitialTiles() {
+        return IntStream.range(0, 3)
+                .mapToObj(j -> deck.draw())
+                .collect(Collectors.toList());
     }
 
     public boolean isEmpty() {
