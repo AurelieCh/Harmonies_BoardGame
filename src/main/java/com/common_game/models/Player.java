@@ -1,6 +1,7 @@
 package com.common_game.models;
 
 import com.common_game.cards.AnimalCard;
+import com.enums.WaterFaceType;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -16,7 +17,8 @@ public class Player {
     private final UUID id;
     private final String name;
     private int score;
-    private final List<AnimalCard> animalCards = new ArrayList<>(); // Cartes animales en possession
+    private final List<AnimalCard> animalCards = new ArrayList<>(); // Animal cards possessed
+    private final WaterFaceType waterFaceType;
 
     /**
      * Méthods that adds a card to the player hand

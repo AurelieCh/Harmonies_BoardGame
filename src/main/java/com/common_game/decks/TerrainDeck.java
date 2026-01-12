@@ -9,21 +9,16 @@ public class TerrainDeck {
 
     public TerrainDeck() {
         List<TerrainTile> tileList = new ArrayList<>();
-        // Ajoute les tuiles (ex: 20 de chaque type)
-        for (int i = 0; i < 20; i++) {
-            tileList.add(new TerrainTile(TerrainType.FOREST));
-            tileList.add(new TerrainTile(TerrainType.MOUNTAIN));
-            tileList.add(new TerrainTile(TerrainType.WATER));
-            tileList.add(new TerrainTile(TerrainType.FIELD));
-            tileList.add(new TerrainTile(TerrainType.BUILDING));
+        // 24 tiles / type (120 total)
+        for (int i = 0; i < 24; i++) {
+            tileList.add(new TerrainTile(TerrainType.FOREST));    // Green (Tree)
+            tileList.add(new TerrainTile(TerrainType.MOUNTAIN));  // Gray (Mountain)
+            tileList.add(new TerrainTile(TerrainType.WATER));     // Blue (Water)
+            tileList.add(new TerrainTile(TerrainType.FIELD));     // Yellow (Field)
+            tileList.add(new TerrainTile(TerrainType.BUILDING));  // Red (Building)
         }
         Collections.shuffle(tileList);
         tiles.addAll(tileList);
-    }
-
-    // Retourne une copie de la Deque sous forme de List
-    public List<TerrainTile> getTiles() {
-        return new ArrayList<>(tiles);
     }
 
     public TerrainTile draw() {

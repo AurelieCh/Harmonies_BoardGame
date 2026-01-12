@@ -14,5 +14,5 @@ public class GameStateResponse {
     private UUID gameId;
     private GameStatus status;
     private List<Player> players;
-    private int currentPlayerIndex;
+    private UUID currentPlayerUUID;
 }

@@ -7,6 +7,7 @@ public enum ErrorCode {
     GAME_NOT_STARTED,
     NOT_YOUR_TURN,
     INVALID_MOVE,
+    GAME_OVER,
 
     // BOARD
     CELL_MAX_HEIGHT_REACHED,

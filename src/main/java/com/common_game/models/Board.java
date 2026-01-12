@@ -1,25 +1,53 @@
 package com.common_game.models;
 
 import com.common_game.decks.Position;
+import com.common_game.rules.AnimalHabitatValidator;
 import com.enums.AnimalType;
 import com.enums.ErrorCode;
 import com.enums.TerrainType;
+import com.enums.WaterFaceType;
 import com.exceptions.GameException;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Getter
+@Setter
 public class Board {
+    private final WaterFaceType waterFaceType;
     private final Map<Position, Cell> cells = new HashMap<>();
     private final Map<Position, AnimalType> animalCubes = new HashMap<>(); // Animal cubes placed
-    private static final int MAX_HEIGHT = 3;
+    private static final int BOARD_SIZE = 5;
+
+
+    public Board(WaterFaceType waterFaceType) {
+        // Init all possible tile -> even empty
+        for (int x = 0; x < BOARD_SIZE; x++) {
+            for (int y = 0; y < BOARD_SIZE; y++) {
+                cells.put(new Position(x, y), new Cell(new Position(x, y)));
+            }
+        }
+        this.waterFaceType = waterFaceType;
+    }
 
     public void placeTile(Position position, TerrainTile tile) {
-        Cell cell = cells.computeIfAbsent(position, Cell::new);
-        if (cell.getStack().size() >= MAX_HEIGHT) {
-            throw new GameException(ErrorCode.CELL_MAX_HEIGHT_REACHED, "Max height reached for this cell");
+        Cell cell = cells.get(position);
+        cell.addTile(tile);
+    }
+
+    public void placeAnimalCube(Position position, AnimalType animalType) {
+        Cell cell = cells.get(position);
+        if (cell.isEmpty() || cell.getAnimal() != null) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "Cannot place animal here");
         }
-        cell.getStack().push(tile);
+
+        if (!AnimalHabitatValidator.isHabitatValid(this, position, animalType)) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "Habitat rule not satisfied for " + animalType);
+        }
+
+        cell.setAnimal(animalType);
     }
 
     public TerrainTile getTopTile(Position position) {
@@ -27,16 +55,12 @@ public class Board {
         return cell != null && !cell.getStack().isEmpty() ? cell.getStack().peek() : null;
     }
 
-    public void placeAnimalCube(Position position, AnimalType animalType) {
-        if (animalCubes.containsKey(position)) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "Animal cube already placed here");
-        }
-        animalCubes.put(position, animalType);
+    public int getEmptyCellsCount() {
+        return (int) cells.values().stream()
+                .filter(Cell::isEmpty)
+                .count();
     }
 
-    public boolean hasAnimalCube(Position position) {
-        return animalCubes.containsKey(position);
-    }
 
     // =============================================
     // Methods to calculate points by landscapes
@@ -49,11 +73,9 @@ public class Board {
     public int calculateTreePoints() {
         int points = 0;
         for (Cell cell : cells.values()) {
-            if (!cell.getStack().isEmpty()) {
-                TerrainTile topTile = cell.getStack().peek();
-                if (topTile.getType() == TerrainType.FOREST) {
-                    points += cell.getStack().size(); // 1 point by lvl
-                }
+            if (!cell.isEmpty() && cell.getTopTile().getType() == TerrainType.FOREST) {
+                int height = cell.getHeight();
+                points += height == 1 ? 1 : height == 2 ? 2 : 4;  // 1/2/4 points
             }
         }
         return points;
@@ -65,27 +87,31 @@ public class Board {
      */
     public int calculateMountainPoints() {
         int points = 0;
-        // Find all connected groups of moutains
         Set<Position> visited = new HashSet<>();
-        for (Position position : cells.keySet()) {
-            if (!visited.contains(position)) {
-                TerrainTile topTile = getTopTile(position);
-                if (topTile != null && topTile.getType() == TerrainType.MOUNTAIN) {
-                    Set<Position> mountainGroup = findConnectedMountains(position, visited);
-                    if (!mountainGroup.isEmpty()) {
-                        // Calculate average size of the groups
-                        int groupSize = mountainGroup.size();
-                        int groupHeight = mountainGroup.stream()
-                                .mapToInt(p -> cells.get(p).getStack().size())
-                                .sum();
-                        int avgHeight = groupHeight / groupSize;
-                        points += avgHeight * groupSize; // Example : 1 point by lvl of mountains
-                    }
+
+        for (Cell cell : cells.values()) {
+            Position position = cell.getPosition();
+            if (!cell.isEmpty() &&
+                    cell.getTopTile().getType() == TerrainType.MOUNTAIN &&
+                    !visited.contains(position)) {
+
+                // Trouve toutes les montagnes connectées à cette position
+                Set<Position> mountainGroup = findConnectedMountains(position, new HashSet<>());
+                visited.addAll(mountainGroup);
+
+                // Chaque montagne du groupe rapporte des points (même isolée, si le groupe a au moins 2 montagnes)
+                for (Position mountainPos : mountainGroup) {
+                    Cell mountainCell = cells.get(mountainPos);
+                    int height = mountainCell.getHeight();
+                    // Une montagne rapporte des points si elle est connectée à au moins une autre
+                    boolean isConnected = mountainGroup.size() > 1;
+                    points += (!isConnected) ? 0 : (height == 1 ? 1 : height == 2 ? 3 : 6);
                 }
             }
         }
         return points;
     }
+
 
     /**
      * Helper capable to find the connected mountains
@@ -162,6 +188,12 @@ public class Board {
             }
         }
         return group;
+    }
+
+    public int calculateWaterPoints() {
+        return waterFaceType == WaterFaceType.RIVER
+                ? calculateWaterPointsFaceA()
+                : calculateWaterPointsFaceB();
     }
 
     /**
@@ -294,5 +326,16 @@ public class Board {
                 + calculateFieldPoints()
                 + (isWaterFaceA ? calculateWaterPointsFaceA() : calculateWaterPointsFaceB())
                 + calculateBuildingPoints();
+    }
+
+    /**
+     * Helper method to help find the adjacent position of a position
+     * @param position The position where we want to find adjacent positions
+     * @return The list of all adjacent position of Position
+     */
+    public List<Position> getAdjacentPositions(Position position) {
+        return position.adjacent().stream()
+                .filter(cells::containsKey)
+                .toList();
     }
 }

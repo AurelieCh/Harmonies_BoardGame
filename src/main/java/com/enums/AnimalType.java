@@ -4,5 +4,7 @@ public enum AnimalType {
     DEER,
     FOX,
     BIRD,
-    FISH
+    FISH,
+    FENNEC,
+    MOUSE
 }
