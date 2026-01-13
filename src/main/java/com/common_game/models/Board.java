@@ -1,5 +1,6 @@
 package com.common_game.models;
 
+import com.common_game.decks.AnimalDeck;
 import com.common_game.decks.Position;
 import com.common_game.rules.AnimalHabitatValidator;
 import com.enums.AnimalType;
@@ -37,13 +38,13 @@ public class Board {
         cell.addTile(tile);
     }
 
-    public void placeAnimalCube(Position position, AnimalType animalType) {
+    public void placeAnimalCube(Position position, AnimalType animalType, AnimalDeck animalDeck) {
         Cell cell = cells.get(position);
         if (cell.isEmpty() || cell.getAnimal() != null) {
             throw new GameException(ErrorCode.INVALID_MOVE, "Cannot place animal here");
         }
 
-        if (!AnimalHabitatValidator.isHabitatValid(this, position, animalType)) {
+        if (!AnimalHabitatValidator.isHabitatValid(this, position, animalType, animalDeck)) {
             throw new GameException(ErrorCode.INVALID_MOVE, "Habitat rule not satisfied for " + animalType);
         }
 
@@ -337,5 +338,74 @@ public class Board {
         return position.adjacent().stream()
                 .filter(cells::containsKey)
                 .toList();
+    }
+
+    @Override
+    public String toString() {
+        if (cells.isEmpty()) {
+            return "=== Board State (3D) ===\n(Empty board)";
+        }
+
+        // Trouve les limites réelles du plateau (en ignorant les cases vides)
+        int minX = cells.keySet().stream().mapToInt(Position::x).min().orElse(0);
+        int maxX = cells.keySet().stream().mapToInt(Position::x).max().orElse(0);
+        int minY = cells.keySet().stream().mapToInt(Position::y).min().orElse(0);
+        int maxY = cells.keySet().stream().mapToInt(Position::y).max().orElse(0);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== Board State (3D) ===\n");
+
+        // Pour chaque niveau (1 à 3)
+        for (int level = 1; level <= 3; level++) {
+            sb.append("--- Level ").append(level).append(" ---\n");
+            for (int y = maxY; y >= minY; y--) {
+                for (int x = minX; x <= maxX; x++) {
+                    Position pos = new Position(x, y);
+                    Cell cell = cells.getOrDefault(pos, new Cell(pos));
+
+                    if (cell.getStack().size() >= level) {
+                        TerrainTile tile = cell.getStack().get(level - 1); // Niveau 1 = index 0
+                        String tileSymbol = getTileSymbol(tile.getType());
+                        // Affiche l'animal uniquement sur le jeton du dessus (niveau 3)
+                        String animalSymbol = (level == 3 && cell.getAnimal() != null)
+                                ? getAnimalSymbol(cell.getAnimal())
+                                : " ";
+                        sb.append("[").append(tileSymbol).append(animalSymbol).append("]");
+                    } else {
+                        sb.append("[  ]"); // Case vide
+                    }
+                }
+                sb.append("\n");
+            }
+        }
+        return sb.toString();
+    }
+
+    private String getTileSymbol(TerrainType type) {
+        if (type == null) return "?";
+        return switch (type) {
+            case WATER -> "🌊";
+            case MOUNTAIN -> "⛰";
+            case FOREST -> "🌳";
+            case FIELD -> "🌾";
+            case BUILDING -> "🏠";
+            default -> "❓";
+        };
+    }
+
+    private String getAnimalSymbol(AnimalType type) {
+        if (type == null) return "";
+        return switch (type) {
+            case DEER -> "🦌"; case FOX -> "🦊"; case BIRD -> "🐦"; case FISH -> "🐟";
+            case BAT -> "🦇"; case HEDGEHOG -> "🦔"; case BEAVER -> "🦫";
+            case OTTER -> "🦦"; case BUTTERFLY -> "🦋"; case RABBIT -> "🐇";
+            case SNAIL -> "🐌"; case FROG -> "🐸"; case SNAKE -> "🐍";
+            case SQUIRREL -> "🐿"; case HAWK -> "🦅"; case OWL -> "🦉";
+            case CRAB -> "🦀"; case TURTLE -> "🐢"; case SALAMANDER -> "🦎";
+            case MOLE -> "🐾"; case DRAGONFLY -> "🪲"; case LADYBUG -> "🐞";
+            case ANT -> "🐜"; case SALMON -> "🐟"; case EAGLE -> "🦅";
+            case RACCOON -> "🦝";
+            default -> "🐾";
+        };
     }
 }

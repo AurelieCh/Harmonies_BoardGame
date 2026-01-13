@@ -11,6 +11,7 @@ import com.api.dtos.response.ScoresResponse;
 import com.api.storages.GameStorage;
 import com.common_game.cards.AnimalCard;
 import com.common_game.decks.Position;
+import com.common_game.models.Board;
 import com.common_game.models.Game;
 import com.common_game.models.Player;
 import com.enums.AnimalType;
@@ -87,7 +88,7 @@ public class GameController {
     @GetMapping("/{gameId}/available-animal-cards")
     public List<AnimalCard> getAvailableAnimalCards(@PathVariable UUID gameId) {
         Game game = getGameOrThrow(gameId);
-        return game.getAvailableAnimalCards().stream().limit(5).toList();
+        return game.getAnimalDeck().getAvailableCards();
     }
 
     @PostMapping("/{gameId}/take-animal-card")
@@ -116,6 +117,14 @@ public class GameController {
                 request.getAnimalType()
         );
 
+        return mapToGameStateResponse(game);
+    }
+
+    @PostMapping("/{gameId}/next")
+    public GameStateResponse nextPersonTurn(@PathVariable UUID gameId) {
+        Game game = getGameOrThrow(gameId);
+
+        game.nextTurn();
         return mapToGameStateResponse(game);
     }
 
@@ -169,6 +178,27 @@ public class GameController {
         );
     }
 
+    @GetMapping("/{gameId}/players/{playerId}/board")
+    public Map<String, Object> getPlayerBoard(
+            @PathVariable UUID gameId,
+            @PathVariable UUID playerId) {
+
+        Game game = getGameOrThrow(gameId);
+        Board board = game.getBoards().get(playerId);
+
+        // JSON board
+        String[] boardLines = board.toString().split("\n");
+
+        // Create a response beautiful
+        Map<String, Object> response = new HashMap<>();
+        response.put("board", boardLines);
+        response.put("playerId", playerId);
+        response.put("gameId", gameId);
+
+        return response;
+    }
+
+
     // -------- Mapping --------
 
     private GameStateResponse mapToGameStateResponse(Game game) {
@@ -177,6 +207,8 @@ public class GameController {
         response.setStatus(game.getStatus());
         response.setPlayers(game.getPlayers());
         response.setCurrentPlayerUUID(game.getCurrentPlayerUUID());
+        response.setNbOfAnimalCardsLeft(game.getAnimalDeck().getAnimalCards().size());
+        response.setNbOfTileLeft(game.getTerrainDeck().getTiles().size());
         return response;
     }
 

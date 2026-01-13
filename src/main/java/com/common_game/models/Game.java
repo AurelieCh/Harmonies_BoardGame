@@ -29,7 +29,7 @@ public class Game {
     private Integer slotNumberToRefill;
     private List<TerrainType> tilesToPlace;
     private TerrainDeck terrainDeck;
-    private List<AnimalCard> availableAnimalCards;
+    private AnimalDeck animalDeck;
     private Map<UUID, Board> boards;
     private final CentralBoard centralBoard;
 
@@ -39,7 +39,7 @@ public class Game {
         this.players = players;
         this.currentPlayerUUID = players.getFirst().getId();
         this.terrainDeck = new TerrainDeck();
-        this.availableAnimalCards = new AnimalDeck().getCards();
+        this.animalDeck = new AnimalDeck();
         this.boards = players.stream()
                 .collect(Collectors.toMap(
                         Player::getId,
@@ -102,18 +102,40 @@ public class Game {
         // Place tile on the board
         Board board = boards.get(playerId);
         for (Map.Entry<Position, TerrainType> entry : tilePlacements.entrySet()) {
-            board.placeTile(entry.getKey(), new TerrainTile(entry.getValue()));
+            if (canPlaceTile(entry.getKey())) {
+                board.placeTile(entry.getKey(), new TerrainTile(entry.getValue()));
+            } else {
+                throw new GameException(ErrorCode.INVALID_MOVE, "Tile must be within the board range");
+            }
         }
 
         // Refill central board
         centralBoard.refillSlot(this.slotNumberToRefill);
         this.slotNumberToRefill = null;
 
-        // Next player's turn
-        nextTurn();
+        // End checks
         status = GameStatus.IN_PROGRESS;
         tilesToPlace = null;
     }
+
+    public boolean canPlaceTile(Position position) {
+        Map<Position, Cell> cells = boards.get(currentPlayerUUID).getCells();
+        Cell cell = cells.get(position);
+        if (cell == null) return false; // hors plateau
+        if (cell.getHeight() >= 3) return false; // pile max atteinte
+
+        // Vérifie si la tuile est adjacente à au moins une autre tuile (sauf si première tuile sur le plateau)
+        boolean isFirstTile = cells.values().stream().allMatch(c -> c.getStack().isEmpty());
+        boolean hasAdjacent = position.adjacent().stream()
+                .anyMatch(adj -> {
+                    Cell c = cells.get(adj);
+                    return c != null && !c.getStack().isEmpty();
+                });
+
+        return isFirstTile || hasAdjacent;
+    }
+
+
 
     public void placeAnimalCube(UUID playerId, Position position, AnimalType animalType) {
         Player player = getPlayerById(playerId);
@@ -123,7 +145,7 @@ public class Game {
                 .orElseThrow(() -> new GameException(ErrorCode.INVALID_MOVE, "Animal card not found"));
 
         Board board = boards.get(playerId);
-        board.placeAnimalCube(position, animalType);
+        board.placeAnimalCube(position, animalType, animalDeck);
         card.incrementPlacedCubes();
     }
 
@@ -150,7 +172,7 @@ public class Game {
     /**
      * Method that allows the actual player turn to end to move to the other
      */
-    private void nextTurn() {
+    public void nextTurn() {
         // Find actual index player
         int currentIndex = -1;
         for (int i = 0; i < players.size(); i++) {
@@ -180,31 +202,19 @@ public class Game {
      */
     public void takeAnimalCard(UUID playerId, AnimalType animalType) {
         Player player = getPlayerById(playerId);
+
         if (player.getAnimalCards().size() >= 4) {
             throw new GameException(ErrorCode.INVALID_MOVE, "Maximum 4 animal cards allowed");
         }
 
-        // Filter on all available card with the good animalType
-        List<AnimalCard> availableCardsOfType = availableAnimalCards.stream()
-                .filter(card -> card.getType() == animalType)
-                .toList();
-
-        if (availableCardsOfType.isEmpty()) {
+        try {
+            // Pioche directement la carte de type animal parmi les 5 visibles
+            AnimalCard chosenCard = animalDeck.drawByType(animalType);
+            player.addAnimalCard(chosenCard);
+        } catch (IllegalArgumentException e) {
             throw new GameException(ErrorCode.INVALID_MOVE, "No available card for " + animalType);
         }
-
-        // Get one randomly
-        AnimalCard chosenCard = availableCardsOfType.get(new Random().nextInt(availableCardsOfType.size()));
-        player.addAnimalCard(chosenCard);
-        availableAnimalCards.remove(chosenCard);
-
-        // Refill the available card to stay at 5
-        if (availableAnimalCards.size() < 5) {
-            availableAnimalCards.add(new AnimalDeck().getCards().removeFirst());
-        }
-
     }
-
 
     /**
      * Method that changes the status of the game to IN_PROGRESS for the start

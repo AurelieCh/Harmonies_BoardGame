@@ -1,82 +1,35 @@
 package com.common_game.rules;
 
-import com.common_game.decks.Position;
+import com.common_game.cards.AnimalCard;
 import com.common_game.models.Board;
-import com.common_game.models.Cell;
+import com.common_game.decks.Position;
+import com.common_game.decks.AnimalDeck;
 import com.enums.AnimalType;
-import com.enums.TerrainType;
 
-public final class AnimalHabitatValidator {
+import java.util.List;
 
-    private AnimalHabitatValidator() {}
+public class AnimalHabitatValidator {
 
-    public static boolean isHabitatValid(Board board, Position position, AnimalType animalType) {
-        return switch (animalType) {
-            case DEER -> isDeerHabitatValid(board, position);
-            case FOX -> isFoxHabitatValid(board, position);
-            case BIRD -> isBirdHabitatValid(board, position);
-            case FISH -> isFishHabitatValid(board, position);
-            case FENNEC -> isFennecHabitatValid(board, position);
-            case MOUSE -> isMouseHabitatValid(board, position);
-        };
-    }
+    /**
+     * Vérifie si la position est valide pour placer un cube animal
+     * @param board Le plateau
+     * @param position La position où placer l'animal
+     * @param animalType Le type d'animal à placer
+     * @param deck Le deck utilisé dans le jeu (important pour refléter les cartes visibles)
+     * @return true si la règle est respectée
+     */
+    public static boolean isHabitatValid(Board board, Position position, AnimalType animalType, AnimalDeck deck) {
+        // On regarde seulement les cartes disponibles
+        List<AnimalCard> visibleCards = deck.getAvailableCards().stream()
+                .filter(card -> card.getType() == animalType)
+                .toList();
 
-    private static boolean isDeerHabitatValid(Board board, Position position) {
-        Cell cell = board.getCells().get(position);
-        if (cell.isEmpty() || cell.getTopTile().getType() != TerrainType.FOREST) {
-            return false;
+        if (visibleCards.isEmpty()) {
+            return false; // aucune carte visible du type demandé
         }
-        return countAdjacentTerrains(board, position, TerrainType.FOREST) >= 2;
-    }
 
-    private static boolean isFoxHabitatValid(Board board, Position position) {
-        Cell cell = board.getCells().get(position);
-        if (cell.isEmpty() || (!isMountainOrForest(cell))) {
-            return false;
-        }
-        return countAdjacentTerrains(board, position, TerrainType.MOUNTAIN) >= 1 &&
-                countAdjacentTerrains(board, position, TerrainType.FOREST) >= 1;
-    }
-
-    private static boolean isBirdHabitatValid(Board board, Position position) {
-        Cell cell = board.getCells().get(position);
-        if (cell.isEmpty() || cell.getTopTile().getType() != TerrainType.WATER) {
-            return false;
-        }
-        return countAdjacentTerrains(board, position, TerrainType.WATER) >= 1;
-    }
-
-    private static boolean isFishHabitatValid(Board board, Position position) {
-        return isBirdHabitatValid(board, position);
-    }
-
-    private static boolean isFennecHabitatValid(Board board, Position position) {
-        Cell cell = board.getCells().get(position);
-        if (cell.isEmpty() || cell.getTopTile().getType() != TerrainType.MOUNTAIN) {
-            return false;
-        }
-        return countAdjacentTerrains(board, position, TerrainType.MOUNTAIN) >= 2;
-    }
-
-    private static boolean isMouseHabitatValid(Board board, Position position) {
-        Cell cell = board.getCells().get(position);
-        if (cell.isEmpty() || cell.getTopTile().getType() != TerrainType.FIELD) {
-            return false;
-        }
-        return countAdjacentTerrains(board, position, TerrainType.FIELD) >= 1;
-    }
-
-    private static boolean isMountainOrForest(Cell cell) {
-        TerrainType type = cell.getTopTile().getType();
-        return type == TerrainType.MOUNTAIN || type == TerrainType.FOREST;
-    }
-
-    private static long countAdjacentTerrains(Board board, Position position, TerrainType type) {
-        return board.getAdjacentPositions(position).stream()
-                .map(board.getCells()::get)
-                .filter(cell -> !cell.isEmpty())
-                .filter(cell -> cell.getTopTile().getType() == type)
-                .count();
+        // Si au moins une carte permet de placer l'animal sur cette position
+        return visibleCards.stream()
+                .anyMatch(card -> card.getRule().isSatisfied(board, position));
     }
 }
-

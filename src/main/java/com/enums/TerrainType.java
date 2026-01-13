@@ -5,5 +5,6 @@ public enum TerrainType {
     MOUNTAIN,
     WATER,
     FIELD,
-    BUILDING
+    BUILDING,
+    BROWN
 }

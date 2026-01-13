@@ -15,4 +15,6 @@ public class GameStateResponse {
     private GameStatus status;
     private List<Player> players;
     private UUID currentPlayerUUID;
+    private Integer nbOfAnimalCardsLeft;
+    private Integer nbOfTileLeft;
 }

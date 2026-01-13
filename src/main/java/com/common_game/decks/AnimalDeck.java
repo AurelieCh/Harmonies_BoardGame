@@ -1,11 +1,7 @@
 package com.common_game.decks;
 
 import com.common_game.cards.AnimalCard;
-import com.common_game.models.TerrainTile;
-import com.common_game.rules.BirdRule;
-import com.common_game.rules.DeerRule;
-import com.common_game.rules.FishRule;
-import com.common_game.rules.FoxRule;
+import com.common_game.rules.HabitatRuleImpl;
 import com.enums.AnimalType;
 import com.enums.TerrainType;
 
@@ -13,65 +9,163 @@ import java.util.*;
 
 public class AnimalDeck {
 
-    private final Deque<AnimalCard> cards = new LinkedList<>();
+    private final Deque<AnimalCard> deck = new LinkedList<>();
+    private final List<AnimalCard> availableCards = new ArrayList<>();
+    private static final int MAX_AVAILABLE = 5;
+
+    public AnimalDeck() {
+        List<AnimalCard> cardsList = this.initCards();
+        // Shuffle and fill the deck
+        Collections.shuffle(cardsList);
+        deck.addAll(cardsList);
+        // Fill 5 first animal card
+        refillAvailableCards();
+    }
+
+    private void refillAvailableCards() {
+        while (availableCards.size() < MAX_AVAILABLE && !deck.isEmpty()) {
+            availableCards.add(deck.removeFirst());
+        }
+    }
 
     /**
-     * Constructs a new animal deck with the given list of initial cards.
-     * The cards are shuffled to randomize their order.
+     * Pioche une carte du type demandé parmi les cartes visibles.
+     * @param type Le type d'animal souhaité
+     * @return La carte choisie
+     * @throws IllegalArgumentException si aucune carte de ce type n'est disponible
      */
-    public AnimalDeck() {
-        List<AnimalCard> cardsList = new ArrayList<>();
-        // Ajoute toutes les cartes animales
-        cardsList.addAll(createDeerCards());
-        cardsList.addAll(createFoxCards());
-        cardsList.addAll(createBirdCards());
-        cardsList.addAll(createFishCards());
-        // Mélange les cartes
-        Collections.shuffle(cardsList);
-        this.cards.addAll(cardsList);
-    }
-
-    private List<AnimalCard> createDeerCards() {
-        return List.of(
-                new AnimalCard(UUID.randomUUID(), AnimalType.DEER, 4, new DeerRule(), List.of(TerrainType.FOREST), 2, 2),
-                new AnimalCard(UUID.randomUUID(), AnimalType.DEER, 3, new DeerRule(), List.of(TerrainType.FOREST), 1, 2)
-        );
-    }
-
-    private List<AnimalCard> createFoxCards() {
-        return List.of(
-                new AnimalCard(UUID.randomUUID(), AnimalType.FOX, 3, new FoxRule(), List.of(TerrainType.MOUNTAIN, TerrainType.FOREST), 2, 1),
-                new AnimalCard(UUID.randomUUID(), AnimalType.FOX, 2, new FoxRule(), List.of(TerrainType.MOUNTAIN, TerrainType.FOREST), 2, 1)
-        );
-    }
-
-    private List<AnimalCard> createBirdCards() {
-        return List.of(
-                new AnimalCard(UUID.randomUUID(), AnimalType.BIRD, 2, new BirdRule(), List.of(TerrainType.WATER), 1, 1),
-                new AnimalCard(UUID.randomUUID(), AnimalType.BIRD, 3, new BirdRule(), List.of(TerrainType.WATER, TerrainType.FOREST), 1, 1)
-        );
-    }
-
-    private List<AnimalCard> createFishCards() {
-        return List.of(
-                new AnimalCard(UUID.randomUUID(), AnimalType.FISH, 2, new FishRule(), List.of(TerrainType.WATER), 1, 1),
-                new AnimalCard(UUID.randomUUID(), AnimalType.FISH, 3, new FishRule(), List.of(TerrainType.WATER), 1, 2)
-        );
-    }
-
-    // Retourne une copie pour éviter les modifications externes
-    public List<AnimalCard> getCards() {
-        return new ArrayList<>(cards);
-    }
-
-    public AnimalCard draw() {
-        if (cards.isEmpty()) {
-            throw new IllegalStateException("Animal deck is empty");
+    public AnimalCard drawByType(AnimalType type) {
+        for (int i = 0; i < availableCards.size(); i++) {
+            AnimalCard card = availableCards.get(i);
+            if (card.getType() == type) {
+                availableCards.remove(i);
+                refillAvailableCards();
+                return card;
+            }
         }
-        return cards.removeFirst();
+        throw new IllegalArgumentException("No card with the type" + type + " available");
+    }
+
+    /**
+     * Return available cards (copy for safety)
+     */
+    public List<AnimalCard> getAvailableCards() {
+        return new ArrayList<>(availableCards);
+    }
+
+    public List<AnimalCard> getAnimalCards() {
+        return new ArrayList<>(deck);
+    }
+
+    private List<AnimalCard> initCards() {
+        List<AnimalCard> cardsList = new ArrayList<>();
+
+        // =====================================================
+        // 32 cartes animales uniques avec patterns plausibles
+        // =====================================================
+
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.DEER, 4,
+                new HabitatRuleImpl(List.of(TerrainType.FOREST), 2),
+                List.of(TerrainType.FOREST), 2, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.FOX, 3,
+                new HabitatRuleImpl(List.of(TerrainType.FOREST, TerrainType.MOUNTAIN), 2),
+                List.of(TerrainType.FOREST, TerrainType.MOUNTAIN), 2, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.BIRD, 2,
+                new HabitatRuleImpl(List.of(TerrainType.WATER), 1),
+                List.of(TerrainType.WATER), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.FISH, 2,
+                new HabitatRuleImpl(List.of(TerrainType.WATER), 1),
+                List.of(TerrainType.WATER), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.BAT, 3,
+                new HabitatRuleImpl(List.of(TerrainType.FOREST, TerrainType.MOUNTAIN), 1),
+                List.of(TerrainType.FOREST, TerrainType.MOUNTAIN), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.HEDGEHOG, 2,
+                new HabitatRuleImpl(List.of(TerrainType.FIELD, TerrainType.FOREST), 2),
+                List.of(TerrainType.FIELD, TerrainType.FOREST), 1, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.BEAVER, 3,
+                new HabitatRuleImpl(List.of(TerrainType.WATER, TerrainType.FOREST), 2),
+                List.of(TerrainType.WATER, TerrainType.FOREST), 2, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.OTTER, 3,
+                new HabitatRuleImpl(List.of(TerrainType.WATER), 2),
+                List.of(TerrainType.WATER), 2, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.BUTTERFLY, 1,
+                new HabitatRuleImpl(List.of(TerrainType.FIELD), 1),
+                List.of(TerrainType.FIELD), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.RABBIT, 2,
+                new HabitatRuleImpl(List.of(TerrainType.FIELD), 1),
+                List.of(TerrainType.FIELD), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.SNAIL, 2,
+                new HabitatRuleImpl(List.of(TerrainType.FIELD), 1),
+                List.of(TerrainType.FIELD), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.FROG, 3,
+                new HabitatRuleImpl(List.of(TerrainType.WATER), 2),
+                List.of(TerrainType.WATER), 2, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.SNAKE, 3,
+                new HabitatRuleImpl(List.of(TerrainType.FIELD, TerrainType.FOREST), 2),
+                List.of(TerrainType.FIELD, TerrainType.FOREST), 1, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.SQUIRREL, 2,
+                new HabitatRuleImpl(List.of(TerrainType.FOREST), 1),
+                List.of(TerrainType.FOREST), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.HAWK, 3,
+                new HabitatRuleImpl(List.of(TerrainType.MOUNTAIN), 2),
+                List.of(TerrainType.MOUNTAIN), 1, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.OWL, 2,
+                new HabitatRuleImpl(List.of(TerrainType.FOREST), 1),
+                List.of(TerrainType.FOREST), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.CRAB, 2,
+                new HabitatRuleImpl(List.of(TerrainType.WATER), 1),
+                List.of(TerrainType.WATER), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.TURTLE, 3,
+                new HabitatRuleImpl(List.of(TerrainType.WATER), 2),
+                List.of(TerrainType.WATER), 2, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.SALAMANDER, 3,
+                new HabitatRuleImpl(List.of(TerrainType.FOREST, TerrainType.WATER), 2),
+                List.of(TerrainType.FOREST, TerrainType.WATER), 1, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.MOLE, 2,
+                new HabitatRuleImpl(List.of(TerrainType.FIELD), 1),
+                List.of(TerrainType.FIELD), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.DRAGONFLY, 2,
+                new HabitatRuleImpl(List.of(TerrainType.WATER), 1),
+                List.of(TerrainType.WATER), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.LADYBUG, 1,
+                new HabitatRuleImpl(List.of(TerrainType.FIELD), 1),
+                List.of(TerrainType.FIELD), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.ANT, 1,
+                new HabitatRuleImpl(List.of(TerrainType.FIELD, TerrainType.FOREST), 1),
+                List.of(TerrainType.FIELD, TerrainType.FOREST), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.BEAVER2, 3,
+                new HabitatRuleImpl(List.of(TerrainType.WATER, TerrainType.MOUNTAIN), 2),
+                List.of(TerrainType.WATER, TerrainType.MOUNTAIN), 2, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.OTTER2, 3,
+                new HabitatRuleImpl(List.of(TerrainType.FOREST, TerrainType.WATER), 2),
+                List.of(TerrainType.FOREST, TerrainType.WATER), 2, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.BUTTERFLY2, 2,
+                new HabitatRuleImpl(List.of(TerrainType.FIELD), 1),
+                List.of(TerrainType.FIELD), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.HAWK2, 3,
+                new HabitatRuleImpl(List.of(TerrainType.MOUNTAIN), 2),
+                List.of(TerrainType.MOUNTAIN), 1, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.OWL2, 2,
+                new HabitatRuleImpl(List.of(TerrainType.FOREST), 1),
+                List.of(TerrainType.FOREST), 1, 1));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.SALAMANDER2, 3,
+                new HabitatRuleImpl(List.of(TerrainType.WATER, TerrainType.FIELD), 2),
+                List.of(TerrainType.WATER, TerrainType.FIELD), 1, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.SALMON, 3,
+                new HabitatRuleImpl(List.of(TerrainType.WATER), 2),
+                List.of(TerrainType.WATER), 2, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.EAGLE, 4,
+                new HabitatRuleImpl(List.of(TerrainType.MOUNTAIN), 2),
+                List.of(TerrainType.MOUNTAIN), 2, 2));
+        cardsList.add(new AnimalCard(UUID.randomUUID(), AnimalType.RACCOON, 2,
+                new HabitatRuleImpl(List.of(TerrainType.FOREST, TerrainType.FIELD), 1),
+                List.of(TerrainType.FOREST, TerrainType.FIELD), 1, 1));
+
+
+        return cardsList;
     }
 
     public boolean isEmpty() {
-        return cards.isEmpty();
+        return deck.isEmpty() && availableCards.isEmpty();
     }
 }

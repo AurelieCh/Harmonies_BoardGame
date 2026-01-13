@@ -15,9 +15,11 @@ public class TerrainDeck {
     private static final Map<TerrainType, Integer> TILE_COUNT = Map.of(
             TerrainType.WATER, 23,    // Blue
             TerrainType.MOUNTAIN, 23, // Gray
-            TerrainType.FOREST, 21,   // Green
+            TerrainType.BROWN, 21, // Brown
+            TerrainType.FOREST, 19,   // Green
             TerrainType.FIELD, 19,    // Yellow
-            TerrainType.BUILDING, 15  // Red
+            TerrainType.BUILDING, 15 // Red
+
     );
 
     public TerrainDeck() {
