@@ -1,5 +1,6 @@
 package com.common_game.models;
 
+import com.api.dtos.request.TilesPlacementRequest;
 import com.api.dtos.response.DrawnTilesResponse;
 import com.api.dtos.response.ScoresResponse;
 import com.common_game.cards.AnimalCard;
@@ -81,7 +82,7 @@ public class Game {
      * @param playerId Player's UUID
      * @param tilePlacements Position where the player want to place the tiles
      */
-    public void placeTiles(UUID playerId, Map<Position, TerrainType> tilePlacements) {
+    public void placeTiles(UUID playerId, List<TilesPlacementRequest> tilePlacements) {
         // Checks
         if (!currentPlayerUUID.equals(playerId)) {
             throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
@@ -93,30 +94,42 @@ public class Game {
             throw new GameException(ErrorCode.INVALID_MOVE, "You must place all 3 tiles");
         }
 
-        // Checks that places tiles are the drawn type
-        List<TerrainType> placedTypes = new ArrayList<>(tilePlacements.values());
-        if (!new HashSet<>(placedTypes).containsAll(tilesToPlace) || !new HashSet<>(tilesToPlace).containsAll(placedTypes)) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "Tile types do not match drawn tiles");
+        // Check that placed tiles match drawn tiles (order-independent)
+        List<TerrainType> placedTypes = tilePlacements.stream()
+                .map(TilesPlacementRequest::getTerrainType)
+                .toList();
+        if (!new HashSet<>(placedTypes).equals(new HashSet<>(tilesToPlace))) {
+            throw new GameException(
+                    ErrorCode.INVALID_MOVE,
+                    "Tile types do not match drawn tiles"
+            );
         }
 
-        // Place tile on the board
+        // Place tiles on the board
         Board board = boards.get(playerId);
-        for (Map.Entry<Position, TerrainType> entry : tilePlacements.entrySet()) {
-            if (canPlaceTile(entry.getKey())) {
-                board.placeTile(entry.getKey(), new TerrainTile(entry.getValue()));
-            } else {
-                throw new GameException(ErrorCode.INVALID_MOVE, "Tile must be within the board range");
+        for (TilesPlacementRequest placement : tilePlacements) {
+            Position position = placement.getPosition();
+            if (!canPlaceTile(position)) {
+                throw new GameException(
+                        ErrorCode.INVALID_MOVE,
+                        "Tile must be within the board range"
+                );
             }
+            board.placeTile(
+                    position,
+                    new TerrainTile(placement.getTerrainType())
+            );
         }
 
         // Refill central board
         centralBoard.refillSlot(this.slotNumberToRefill);
         this.slotNumberToRefill = null;
 
-        // End checks
+        // End turn
         status = GameStatus.IN_PROGRESS;
         tilesToPlace = null;
     }
+
 
     public boolean canPlaceTile(Position position) {
         Map<Position, Cell> cells = boards.get(currentPlayerUUID).getCells();
@@ -134,8 +147,6 @@ public class Game {
 
         return isFirstTile || hasAdjacent;
     }
-
-
 
     public void placeAnimalCube(UUID playerId, Position position, AnimalType animalType) {
         Player player = getPlayerById(playerId);

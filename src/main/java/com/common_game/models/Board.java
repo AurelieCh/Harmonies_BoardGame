@@ -17,24 +17,25 @@ import java.util.stream.Collectors;
 @Getter
 @Setter
 public class Board {
+    private Map<Position, Cell> cells;
     private final WaterFaceType waterFaceType;
-    private final Map<Position, Cell> cells = new HashMap<>();
     private final Map<Position, AnimalType> animalCubes = new HashMap<>(); // Animal cubes placed
-    private static final int BOARD_SIZE = 5;
-
+    public static final int BOARD_SIZE = 5;
 
     public Board(WaterFaceType waterFaceType) {
-        // Init all possible tile -> even empty
+        this.cells = new HashMap<>();
+        this.waterFaceType = waterFaceType;
+
         for (int x = 0; x < BOARD_SIZE; x++) {
             for (int y = 0; y < BOARD_SIZE; y++) {
-                cells.put(new Position(x, y), new Cell(new Position(x, y)));
+                Position pos = new Position(x, y);
+                cells.put(pos, new Cell(pos));
             }
         }
-        this.waterFaceType = waterFaceType;
     }
 
     public void placeTile(Position position, TerrainTile tile) {
-        Cell cell = cells.get(position);
+        Cell cell = cells.computeIfAbsent(position, Cell::new);
         cell.addTile(tile);
     }
 

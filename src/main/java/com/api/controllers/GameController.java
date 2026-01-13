@@ -10,7 +10,6 @@ import com.api.dtos.response.RemainingCardsResponse;
 import com.api.dtos.response.ScoresResponse;
 import com.api.storages.GameStorage;
 import com.common_game.cards.AnimalCard;
-import com.common_game.decks.Position;
 import com.common_game.models.Board;
 import com.common_game.models.Game;
 import com.common_game.models.Player;
@@ -24,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/game")
@@ -71,15 +69,7 @@ public class GameController {
 
         Game game = getGameOrThrow(gameId);
 
-        // Conversion List → Map
-        Map<Position, TerrainType> tileMap = request
-                .stream()
-                .collect(Collectors.toMap(
-                        TilesPlacementRequest::getPosition,
-                        TilesPlacementRequest::getTerrainType
-                ));
-
-        game.placeTiles(game.getCurrentPlayer().getId(), tileMap);
+        game.placeTiles(game.getCurrentPlayer().getId(), request);
 
         return mapToGameStateResponse(game);
     }
