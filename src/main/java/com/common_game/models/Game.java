@@ -7,6 +7,7 @@ import com.common_game.cards.AnimalCard;
 import com.common_game.decks.AnimalDeck;
 import com.common_game.decks.Position;
 import com.common_game.decks.TerrainDeck;
+import com.common_game.rules.TurnState;
 import com.enums.AnimalType;
 import com.enums.ErrorCode;
 import com.enums.GameStatus;
@@ -33,6 +34,7 @@ public class Game {
     private AnimalDeck animalDeck;
     private Map<UUID, Board> boards;
     private final CentralBoard centralBoard;
+    private TurnState turnState;
 
     public Game(List<Player> players) {
         this.id = UUID.randomUUID();
@@ -47,6 +49,7 @@ public class Game {
                         player -> new Board(player.getWaterFaceType())
                 ));
         this.centralBoard = new CentralBoard(terrainDeck);
+        this.turnState = new TurnState();
     }
 
     /**
@@ -57,10 +60,22 @@ public class Game {
     public DrawnTilesResponse takeTilesFromCentralBoard(UUID playerId, int slotNumber) {
         // Checks
         if (!currentPlayerUUID.equals(playerId)) {
-            throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
+            throw new GameException(
+                    ErrorCode.NOT_YOUR_TURN,
+                    "Not your turn"
+            );
+        }
+        if (status == GameStatus.WAITING_FOR_PLACEMENT) {
+            throw new GameException(
+                    ErrorCode.INVALID_MOVE,
+                    "Tiles have already been drawn this turn"
+            );
         }
         if (status != GameStatus.IN_PROGRESS) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "Game not started");
+            throw new GameException(
+                    ErrorCode.INVALID_MOVE,
+                    "Game not started"
+            );
         }
 
         // Draw 3 tiles
@@ -69,6 +84,9 @@ public class Game {
         // Store tiles type
         tilesToPlace = tiles.stream().map(TerrainTile::getType).collect(Collectors.toList());
         this.slotNumberToRefill = slotNumber;
+
+        // TurnState -> Draw as been done
+        turnState.drawTiles();
 
         // Mod WAITING
         status = GameStatus.WAITING_FOR_PLACEMENT;
@@ -85,13 +103,28 @@ public class Game {
     public void placeTiles(UUID playerId, List<TilesPlacementRequest> tilePlacements) {
         // Checks
         if (!currentPlayerUUID.equals(playerId)) {
-            throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
+            throw new GameException(
+                    ErrorCode.NOT_YOUR_TURN,
+                    "Not your turn"
+            );
+        }
+        if (turnState.isTilesPlaced()) {
+            throw new GameException(
+                    ErrorCode.INVALID_MOVE,
+                    "You already placed the tiles"
+            );
         }
         if (status != GameStatus.WAITING_FOR_PLACEMENT) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "You must draw tiles first");
+            throw new GameException(
+                    ErrorCode.INVALID_MOVE,
+                    "You must draw tiles first"
+            );
         }
         if (tilePlacements.size() != tilesToPlace.size()) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "You must place all 3 tiles");
+            throw new GameException(
+                    ErrorCode.INVALID_MOVE,
+                    "You must place all 3 tiles"
+            );
         }
 
         // Check that placed tiles match drawn tiles (order-independent)
@@ -124,6 +157,9 @@ public class Game {
         // Refill central board
         centralBoard.refillSlot(this.slotNumberToRefill);
         this.slotNumberToRefill = null;
+
+        // TurnState place have been done
+        turnState.placeTiles();
 
         // End turn
         status = GameStatus.IN_PROGRESS;
@@ -158,6 +194,8 @@ public class Game {
         Board board = boards.get(playerId);
         board.placeAnimalCube(position, animalType, animalDeck);
         card.incrementPlacedCubes();
+
+        turnState.placeAnimalCube();
     }
 
     /**
@@ -181,6 +219,15 @@ public class Game {
     }
 
     /**
+     * Method to assert that the player as done the necessary actions to end his turn
+     */
+    public void endTurn() {
+        turnState.assertCanEndTurn();
+        nextTurn();
+    }
+
+
+    /**
      * Method that allows the actual player turn to end to move to the other
      */
     public void nextTurn() {
@@ -200,6 +247,9 @@ public class Game {
         // Go to the next or the first player
         int nextIndex = (currentIndex + 1) % players.size();
         currentPlayerUUID = players.get(nextIndex).getId();
+
+        // reinit the state of the TurnState class for the next player
+        turnState.reinit();
     }
 
 
@@ -219,11 +269,22 @@ public class Game {
         }
 
         try {
-            // Pioche directement la carte de type animal parmi les 5 visibles
+            if (turnState.isAnimalCardDrawn()) {
+                throw new GameException(
+                        ErrorCode.INVALID_MOVE,
+                        "Card has already been drawn"
+                );
+            }
+            // Draw the animal type card among those visible
             AnimalCard chosenCard = animalDeck.drawByType(animalType);
+            // Turnstate draw animal card have been done
+            turnState.drawAnimalCard();
             player.addAnimalCard(chosenCard);
         } catch (IllegalArgumentException e) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "No available card for " + animalType);
+            throw new GameException(
+                    ErrorCode.INVALID_MOVE,
+                    "No available card for " + animalType
+            );
         }
     }
 

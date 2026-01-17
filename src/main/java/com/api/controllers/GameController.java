@@ -114,7 +114,7 @@ public class GameController {
     public GameStateResponse nextPersonTurn(@PathVariable UUID gameId) {
         Game game = getGameOrThrow(gameId);
 
-        game.nextTurn();
+        game.endTurn();
         return mapToGameStateResponse(game);
     }
 

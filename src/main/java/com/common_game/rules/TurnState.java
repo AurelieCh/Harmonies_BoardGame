@@ -22,6 +22,21 @@ public class TurnState {
     private boolean animalCardDrawn = false;
 
     /* =========================
+       Reinit for next player
+       ========================= */
+
+    /**
+     * Réinitialise l'état du tour pour le prochain joueur.
+     */
+    public void reinit() {
+        this.tilesDrawn = false;
+        this.tilesPlaced = false;
+        this.animalCubePlaced = false;
+        this.animalCardDrawn = false;
+    }
+
+
+    /* =========================
        Mandatory actions
        ========================= */
 
