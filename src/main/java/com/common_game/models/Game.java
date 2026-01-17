@@ -96,93 +96,121 @@ public class Game {
     }
 
     /**
-     * Method that allows a player to place a tile at a position
-     * @param playerId Player's UUID
-     * @param tilePlacements Position where the player want to place the tiles
+     * Method that allows a player to place a tile at positions
+     * Transactional: either all tiles are placed, or none
+     *
+     * @param playerId UUID of the player
+     * @param tilePlacements list of tiles to place (optionally with height)
      */
     public void placeTiles(UUID playerId, List<TilesPlacementRequest> tilePlacements) {
-        // Checks
+        checkTurnAndStatus(playerId, tilePlacements);
+        validateTileCounts(tilePlacements);
+
+        Board board = boards.get(playerId);
+
+        List<TilesPlacementRequest> sortedTiles = sortByHeight(tilePlacements);
+
+        validatePlacementRules(board, sortedTiles);
+
+        placeTilesOnBoard(board, sortedTiles);
+
+        refillAndFinishTurn();
+    }
+
+    private void checkTurnAndStatus(UUID playerId, List<TilesPlacementRequest> tilePlacements) {
         if (!currentPlayerUUID.equals(playerId)) {
-            throw new GameException(
-                    ErrorCode.NOT_YOUR_TURN,
-                    "Not your turn"
-            );
+            throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
         }
         if (turnState.isTilesPlaced()) {
-            throw new GameException(
-                    ErrorCode.INVALID_MOVE,
-                    "You already placed the tiles"
-            );
+            throw new GameException(ErrorCode.INVALID_MOVE, "You already placed the tiles");
         }
         if (status != GameStatus.WAITING_FOR_PLACEMENT) {
-            throw new GameException(
-                    ErrorCode.INVALID_MOVE,
-                    "You must draw tiles first"
-            );
+            throw new GameException(ErrorCode.INVALID_MOVE, "You must draw tiles first");
         }
         if (tilePlacements.size() != tilesToPlace.size()) {
-            throw new GameException(
-                    ErrorCode.INVALID_MOVE,
-                    "You must place all 3 tiles"
-            );
+            throw new GameException(ErrorCode.INVALID_MOVE, "You must place all tiles");
         }
+    }
 
-        // Check that placed tiles match drawn tiles (order-independent)
-        List<TerrainType> placedTypes = tilePlacements.stream()
+    private void validateTileCounts(List<TilesPlacementRequest> tilePlacements) {
+        Map<TerrainType, Long> drawnCounts = tilesToPlace.stream()
+                .collect(Collectors.groupingBy(t -> t, Collectors.counting()));
+
+        Map<TerrainType, Long> placedCounts = tilePlacements.stream()
                 .map(TilesPlacementRequest::getTerrainType)
-                .toList();
-        if (!new HashSet<>(placedTypes).equals(new HashSet<>(tilesToPlace))) {
-            throw new GameException(
-                    ErrorCode.INVALID_MOVE,
-                    "Tile types do not match drawn tiles"
-            );
-        }
+                .collect(Collectors.groupingBy(t -> t, Collectors.counting()));
 
-        // Place tiles on the board
-        Board board = boards.get(playerId);
-        for (TilesPlacementRequest placement : tilePlacements) {
-            Position position = placement.getPosition();
-            if (!canPlaceTile(position)) {
-                throw new GameException(
-                        ErrorCode.INVALID_MOVE,
-                        "Tile must be within the board range"
-                );
+        if (!drawnCounts.equals(placedCounts)) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "Tile types do not match drawn tiles");
+        }
+    }
+
+    private List<TilesPlacementRequest> sortByHeight(List<TilesPlacementRequest> tilePlacements) {
+        List<TilesPlacementRequest> sorted = new ArrayList<>(tilePlacements);
+        sorted.sort(Comparator.comparing(tp -> tp.getHeight() != null ? tp.getHeight() : Integer.MAX_VALUE));
+        return sorted;
+    }
+
+    private void validatePlacementRules(Board board, List<TilesPlacementRequest> sortedTiles) {
+        boolean isFirstTile = board.getCells().values().stream().allMatch(c -> c.getStack().isEmpty());
+
+        // Grouper par cellule pour simuler la pile
+        Map<Position, List<TilesPlacementRequest>> byCell = sortedTiles.stream()
+                .collect(Collectors.groupingBy(TilesPlacementRequest::getPosition));
+
+        for (Map.Entry<Position, List<TilesPlacementRequest>> entry : byCell.entrySet()) {
+            Position pos = entry.getKey();
+            Cell cell = board.getCells().get(pos);
+
+            if (cell == null) throw new GameException(ErrorCode.INVALID_MOVE, "Tile must be within the board range");
+
+            // Trier les tuiles de cette cellule par height
+            List<TilesPlacementRequest> cellPlacements = entry.getValue();
+            cellPlacements.sort(Comparator.comparing(tp -> tp.getHeight() != null ? tp.getHeight() : Integer.MAX_VALUE));
+
+            int simulatedHeight = cell.getHeight(); // Hauteur avant ce tour
+            for (TilesPlacementRequest placement : cellPlacements) {
+                if (simulatedHeight >= 3)
+                    throw new GameException(ErrorCode.INVALID_MOVE, "Cannot place more than 3 tiles on a cell");
+
+                if (placement.getHeight() != null && placement.getHeight() != simulatedHeight)
+                    throw new GameException(ErrorCode.INVALID_MOVE, "Cannot skip levels when placing tiles");
+
+                simulatedHeight++; // On simule l’empilement pour la prochaine tile sur cette cellule
             }
-            board.placeTile(
-                    position,
-                    new TerrainTile(placement.getTerrainType())
-            );
         }
 
-        // Refill central board
+        // Vérification adjacency après simulation
+        for (TilesPlacementRequest placement : sortedTiles) {
+            if (!isFirstTile) {
+                Position pos = placement.getPosition();
+                boolean hasAdjacent = pos.adjacent().stream().anyMatch(adj -> {
+                    Cell c = board.getCells().get(adj);
+                    return c != null && !c.getStack().isEmpty();
+                });
+                if (!hasAdjacent)
+                    throw new GameException(ErrorCode.INVALID_MOVE, "All tiles must be adjacent to existing tiles");
+            }
+        }
+    }
+
+
+    private void placeTilesOnBoard(Board board, List<TilesPlacementRequest> sortedTiles) {
+        for (TilesPlacementRequest placement : sortedTiles) {
+            Integer height = placement.getHeight();
+            TerrainTile tile = new TerrainTile(placement.getTerrainType());
+            board.placeTile(placement.getPosition(), tile, height);
+        }
+    }
+
+    private void refillAndFinishTurn() {
         centralBoard.refillSlot(this.slotNumberToRefill);
         this.slotNumberToRefill = null;
-
-        // TurnState place have been done
         turnState.placeTiles();
-
-        // End turn
         status = GameStatus.IN_PROGRESS;
         tilesToPlace = null;
     }
 
-
-    public boolean canPlaceTile(Position position) {
-        Map<Position, Cell> cells = boards.get(currentPlayerUUID).getCells();
-        Cell cell = cells.get(position);
-        if (cell == null) return false; // hors plateau
-        if (cell.getHeight() >= 3) return false; // pile max atteinte
-
-        // Vérifie si la tuile est adjacente à au moins une autre tuile (sauf si première tuile sur le plateau)
-        boolean isFirstTile = cells.values().stream().allMatch(c -> c.getStack().isEmpty());
-        boolean hasAdjacent = position.adjacent().stream()
-                .anyMatch(adj -> {
-                    Cell c = cells.get(adj);
-                    return c != null && !c.getStack().isEmpty();
-                });
-
-        return isFirstTile || hasAdjacent;
-    }
 
     public void placeAnimalCube(UUID playerId, Position position, AnimalType animalType) {
         Player player = getPlayerById(playerId);

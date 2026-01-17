@@ -2,6 +2,7 @@ package com.api.dtos.request;
 
 import com.common_game.decks.Position;
 import com.enums.TerrainType;
+import jakarta.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -10,5 +11,7 @@ import lombok.Setter;
 public class TilesPlacementRequest {
     private Position position;
     private TerrainType terrainType;
+    @Nullable
+    private Integer height;
 }
 

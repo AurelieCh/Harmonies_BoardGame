@@ -26,17 +26,36 @@ public class Board {
         this.cells = new HashMap<>();
         this.waterFaceType = waterFaceType;
 
-        for (int x = 0; x < BOARD_SIZE; x++) {
-            for (int y = 0; y < BOARD_SIZE; y++) {
-                Position pos = new Position(x, y);
+        for (int y = 0; y < BOARD_SIZE; y++) {
+            int rowSize = (y % 2 == 0) ? 5 : 4;
+            int xOffset = (y % 2 == 0) ? 0 : 1;
+
+            for (int x = 0; x < rowSize; x++) {
+                Position pos = new Position(x + xOffset, y);
                 cells.put(pos, new Cell(pos));
             }
         }
     }
 
-    public void placeTile(Position position, TerrainTile tile) {
-        Cell cell = cells.computeIfAbsent(position, Cell::new);
-        cell.addTile(tile);
+    /**
+     * Place a tile at a position, optionally at a specific height (0 = level 1)
+     */
+    public void placeTile(Position position, TerrainTile tile, Integer height) {
+        Cell cell = cells.get(position);
+        if (cell == null) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "Tile must be within the board range");
+        }
+
+        // Default: push on top
+        if (height == null) {
+            cell.addTile(tile);
+        } else {
+            if (height != cell.getHeight()) {
+                throw new GameException(ErrorCode.INVALID_MOVE,
+                        "Cannot place tile at height " + height + ", expected " + cell.getHeight());
+            }
+            cell.addTile(tile);
+        }
     }
 
     public void placeAnimalCube(Position position, AnimalType animalType, AnimalDeck animalDeck) {
@@ -330,55 +349,56 @@ public class Board {
                 + calculateBuildingPoints();
     }
 
-    /**
-     * Helper method to help find the adjacent position of a position
-     * @param position The position where we want to find adjacent positions
-     * @return The list of all adjacent position of Position
-     */
-    public List<Position> getAdjacentPositions(Position position) {
-        return position.adjacent().stream()
-                .filter(cells::containsKey)
-                .toList();
-    }
-
     @Override
     public String toString() {
         if (cells.isEmpty()) {
             return "=== Board State (3D) ===\n(Empty board)";
         }
 
-        // Trouve les limites réelles du plateau (en ignorant les cases vides)
-        int minX = cells.keySet().stream().mapToInt(Position::x).min().orElse(0);
-        int maxX = cells.keySet().stream().mapToInt(Position::x).max().orElse(0);
         int minY = cells.keySet().stream().mapToInt(Position::y).min().orElse(0);
         int maxY = cells.keySet().stream().mapToInt(Position::y).max().orElse(0);
 
         StringBuilder sb = new StringBuilder();
         sb.append("=== Board State (3D) ===\n");
 
-        // Pour chaque niveau (1 à 3)
+        // Pour chaque niveau (stack height)
         for (int level = 1; level <= 3; level++) {
             sb.append("--- Level ").append(level).append(" ---\n");
+
             for (int y = maxY; y >= minY; y--) {
-                for (int x = minX; x <= maxX; x++) {
-                    Position pos = new Position(x, y);
-                    Cell cell = cells.getOrDefault(pos, new Cell(pos));
+
+                final int rowY = y;
+
+                if (rowY % 2 == 1) sb.append("  "); // décalage hex
+
+                List<Position> rowPositions = cells.keySet().stream()
+                        .filter(p -> p.y() == rowY)
+                        .sorted(Comparator.comparingInt(Position::x))
+                        .toList();
+
+                for (Position pos : rowPositions) {
+                    Cell cell = cells.get(pos);
+
+                    // **Ajout debug : afficher la position**
+                    sb.append("(").append(pos.x()).append(",").append(pos.y()).append(")");
 
                     if (cell.getStack().size() >= level) {
-                        TerrainTile tile = cell.getStack().get(level - 1); // Niveau 1 = index 0
+                        TerrainTile tile = cell.getStack().get(level - 1);
                         String tileSymbol = getTileSymbol(tile.getType());
-                        // Affiche l'animal uniquement sur le jeton du dessus (niveau 3)
-                        String animalSymbol = (level == 3 && cell.getAnimal() != null)
-                                ? getAnimalSymbol(cell.getAnimal())
-                                : " ";
+                        String animalSymbol =
+                                (level == 3 && cell.getAnimal() != null)
+                                        ? getAnimalSymbol(cell.getAnimal())
+                                        : " ";
                         sb.append("[").append(tileSymbol).append(animalSymbol).append("]");
                     } else {
-                        sb.append("[  ]"); // Case vide
+                        sb.append("[  ]");
                     }
+                    sb.append(" "); // petit espace pour séparer les cases
                 }
                 sb.append("\n");
             }
         }
+
         return sb.toString();
     }
 
