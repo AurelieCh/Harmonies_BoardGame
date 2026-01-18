@@ -1,6 +1,8 @@
 package com.common_game.models;
 
+import com.common_game.cards.AnimalCard;
 import com.common_game.decks.Position;
+import com.common_game.rules.AnimalHabitatValidator;
 import com.enums.AnimalType;
 import com.enums.ErrorCode;
 import com.enums.TerrainType;
@@ -55,28 +57,16 @@ public class Board {
         }
     }
 
-    public void placeAnimalCube(Position position, AnimalType animalType, CentralBoard centralBoard) {
+    public void placeAnimalCube(Position position, AnimalType animalType, CentralBoard centralBoard, AnimalCard card) {
         Cell cell = cells.get(position);
+        if (cell == null) throw new GameException(ErrorCode.INVALID_POSITION, "Invalid position");
+        if (cell.isEmpty()) throw new GameException(ErrorCode.INVALID_MOVE, "Cannot place on empty cell");
+        if (cell.hasAnimalCube()) throw new GameException(ErrorCode.INVALID_MOVE, "Cell already has an animal cube");
 
-        if (cell == null) {
-            throw new GameException(ErrorCode.INVALID_POSITION, "Invalid position");
-        }
+        AnimalHabitatValidator.assertCanPlaceAnimal(this, position, card);
 
-        if (cell.isEmpty()) {
-            throw new GameException(
-                    ErrorCode.INVALID_MOVE,
-                    "Cannot place animal cube on an empty cell"
-            );
-        }
-
-        if (cell.getAnimalCube() != null) {
-            throw new GameException(
-                    ErrorCode.INVALID_MOVE,
-                    "Cell already contains an animal cube"
-            );
-        }
-
-        centralBoard.setNbOfAnimalCubeLeft(centralBoard.getNbOfAnimalCubeLeft()-1);
+        // placement
+        centralBoard.setNbOfAnimalCubeLeft(centralBoard.getNbOfAnimalCubeLeft() - 1);
         cell.setAnimalCube(animalType);
     }
 

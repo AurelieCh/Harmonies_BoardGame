@@ -218,6 +218,12 @@ public class Game {
                     "Game not started"
             );
         }
+        if (turnState.isAnimalCubePlaced()) {
+            throw new GameException(
+                    ErrorCode.INVALID_MOVE,
+                    "Cube already placed this turn"
+            );
+        }
 
         Player player = getPlayerById(playerId);
         AnimalCard card = player.getAnimalCards().stream()
@@ -226,7 +232,7 @@ public class Game {
                 .orElseThrow(() -> new GameException(ErrorCode.INVALID_MOVE, "Animal card not found"));
 
         Board board = boards.get(playerId);
-        board.placeAnimalCube(position, animalType, centralBoard);
+        board.placeAnimalCube(position, animalType, centralBoard, card);
         card.incrementPlacedCubes();
 
         turnState.placeAnimalCube();

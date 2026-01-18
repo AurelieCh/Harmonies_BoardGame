@@ -18,7 +18,7 @@ public class AnimalCard {
     private final int points;
     private final int cubeCount;
     private final AnimalScoringRule scoringRule;
-    private final List<TerrainRequirement> terrainRequirements; // conditions d'habitat
+    private final List<TerrainRequirement> terrainRequirements;
     private int placedCubes;
 
     public AnimalCard(UUID id, AnimalType type, int points, int cubeCount,
