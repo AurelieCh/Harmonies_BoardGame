@@ -20,8 +20,8 @@ public class AnimalDeckFactory {
         cards.add(new AnimalCard(UUID.randomUUID(),
                 AnimalType.BAT,
                 2, 2,
-                new TerrainBonusAnimalScoring(TerrainType.FOREST, 1),
-                List.of(new TerrainRequirement(TerrainType.FOREST, 1, false))));
+                new TerrainBonusAnimalScoring(TerrainType.TREE, 1),
+                List.of(new TerrainRequirement(TerrainType.TREE, 1, false))));
 
         // 2. FOX
         cards.add(new AnimalCard(UUID.randomUUID(),
@@ -41,8 +41,8 @@ public class AnimalDeckFactory {
         cards.add(new AnimalCard(UUID.randomUUID(),
                 AnimalType.SQUIRREL,
                 2, 2,
-                new TerrainBonusAnimalScoring(TerrainType.FOREST, 1),
-                List.of(new TerrainRequirement(TerrainType.FOREST, 1, false))));
+                new TerrainBonusAnimalScoring(TerrainType.TREE, 1),
+                List.of(new TerrainRequirement(TerrainType.TREE, 1, false))));
 
         // 5. RABBIT
         cards.add(new AnimalCard(UUID.randomUUID(),
@@ -55,8 +55,8 @@ public class AnimalDeckFactory {
         cards.add(new AnimalCard(UUID.randomUUID(),
                 AnimalType.OWL,
                 3, 1,
-                new TerrainBonusAnimalScoring(TerrainType.FOREST, 2),
-                List.of(new TerrainRequirement(TerrainType.FOREST, 1, false))));
+                new TerrainBonusAnimalScoring(TerrainType.TREE, 2),
+                List.of(new TerrainRequirement(TerrainType.TREE, 1, false))));
 
         // 7. WOLF
         cards.add(new AnimalCard(UUID.randomUUID(),
@@ -69,8 +69,8 @@ public class AnimalDeckFactory {
         cards.add(new AnimalCard(UUID.randomUUID(),
                 AnimalType.DEER,
                 2, 3,
-                new TerrainBonusAnimalScoring(TerrainType.FOREST, 1),
-                List.of(new TerrainRequirement(TerrainType.FOREST, 1, false))));
+                new TerrainBonusAnimalScoring(TerrainType.TREE, 1),
+                List.of(new TerrainRequirement(TerrainType.TREE, 1, false))));
 
         // 9. MOUSE
         cards.add(new AnimalCard(UUID.randomUUID(),
@@ -233,14 +233,7 @@ public class AnimalDeckFactory {
                 new TerrainBonusAnimalScoring(TerrainType.BUILDING, 1),
                 List.of(new TerrainRequirement(TerrainType.BUILDING, 1, false))));
 
-        // 32. DEERHOUND
-        cards.add(new AnimalCard(UUID.randomUUID(),
-                AnimalType.DEERHOUND,
-                2, 2,
-                new TerrainBonusAnimalScoring(TerrainType.FOREST, 1),
-                List.of(new TerrainRequirement(TerrainType.FOREST, 1, false))));
-
-        // 33. RACCOON
+        // 32. RACCOON
         cards.add(new AnimalCard(UUID.randomUUID(),
                 AnimalType.RACCOON,
                 3, 1,

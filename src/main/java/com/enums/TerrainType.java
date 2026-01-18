@@ -1,7 +1,7 @@
 package com.enums;
 
 public enum TerrainType {
-    FOREST,
+    TREE,
     MOUNTAIN,
     WATER,
     FIELD,

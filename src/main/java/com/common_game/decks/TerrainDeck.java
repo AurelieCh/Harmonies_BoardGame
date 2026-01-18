@@ -16,7 +16,7 @@ public class TerrainDeck {
             TerrainType.WATER, 23,    // Blue
             TerrainType.MOUNTAIN, 23, // Gray
             TerrainType.BROWN, 21, // Brown
-            TerrainType.FOREST, 19,   // Green
+            TerrainType.TREE, 19,   // Green
             TerrainType.FIELD, 19,    // Yellow
             TerrainType.BUILDING, 15 // Red
 

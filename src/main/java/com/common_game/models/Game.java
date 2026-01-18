@@ -7,6 +7,7 @@ import com.common_game.cards.AnimalCard;
 import com.common_game.decks.AnimalDeck;
 import com.common_game.decks.Position;
 import com.common_game.decks.TerrainDeck;
+import com.common_game.rules.TileRules;
 import com.common_game.rules.TurnState;
 import com.enums.AnimalType;
 import com.enums.ErrorCode;
@@ -152,23 +153,29 @@ public class Game {
     }
 
     private void validatePlacementRules(Board board, List<TilesPlacementRequest> sortedTiles) {
-        boolean isFirstTile = board.getCells().values().stream().allMatch(c -> c.getStack().isEmpty());
+        // Crée une map temporaire pour simuler l'état des stacks
+        Map<Position, List<TerrainType>> simulatedStacks = new HashMap<>();
+        board.getCells().forEach((pos, cell) ->
+                simulatedStacks.put(pos, new ArrayList<>(cell.getStack().stream()
+                        .map(TerrainTile::getType)
+                        .toList()))
+        );
 
-        // Grouper par cellule pour simuler la pile
+        // Groupe par cellule pour simuler pile
         Map<Position, List<TilesPlacementRequest>> byCell = sortedTiles.stream()
                 .collect(Collectors.groupingBy(TilesPlacementRequest::getPosition));
 
         for (Map.Entry<Position, List<TilesPlacementRequest>> entry : byCell.entrySet()) {
             Position pos = entry.getKey();
             Cell cell = board.getCells().get(pos);
-
             if (cell == null) throw new GameException(ErrorCode.INVALID_MOVE, "Tile must be within the board range");
 
-            // Trier les tuiles de cette cellule par height
             List<TilesPlacementRequest> cellPlacements = entry.getValue();
             cellPlacements.sort(Comparator.comparing(tp -> tp.getHeight() != null ? tp.getHeight() : Integer.MAX_VALUE));
 
-            int simulatedHeight = cell.getHeight(); // Hauteur avant ce tour
+            List<TerrainType> tempStack = simulatedStacks.get(pos);
+            int simulatedHeight = tempStack.size();
+
             for (TilesPlacementRequest placement : cellPlacements) {
                 if (simulatedHeight >= 3)
                     throw new GameException(ErrorCode.INVALID_MOVE, "Cannot place more than 3 tiles on a cell");
@@ -176,30 +183,22 @@ public class Game {
                 if (placement.getHeight() != null && placement.getHeight() != simulatedHeight)
                     throw new GameException(ErrorCode.INVALID_MOVE, "Cannot skip levels when placing tiles");
 
-                simulatedHeight++; // On simule l’empilement pour la prochaine tile sur cette cellule
-            }
-        }
+                if (TileRules.isPlacementAllowed(tempStack, placement.getTerrainType()))
+                    throw new GameException(ErrorCode.INVALID_MOVE,
+                            "This tile cannot be placed here due to stack rules");
 
-        // Vérification adjacency après simulation
-        for (TilesPlacementRequest placement : sortedTiles) {
-            if (!isFirstTile) {
-                Position pos = placement.getPosition();
-                boolean hasAdjacent = pos.adjacent().stream().anyMatch(adj -> {
-                    Cell c = board.getCells().get(adj);
-                    return c != null && !c.getStack().isEmpty();
-                });
-                if (!hasAdjacent)
-                    throw new GameException(ErrorCode.INVALID_MOVE, "All tiles must be adjacent to existing tiles");
+                tempStack.add(placement.getTerrainType());
+                simulatedHeight++;
             }
+
+            simulatedStacks.put(pos, tempStack);
         }
     }
 
-
     private void placeTilesOnBoard(Board board, List<TilesPlacementRequest> sortedTiles) {
         for (TilesPlacementRequest placement : sortedTiles) {
-            Integer height = placement.getHeight();
             TerrainTile tile = new TerrainTile(placement.getTerrainType());
-            board.placeTile(placement.getPosition(), tile, height);
+            board.placeTile(placement.getPosition(), tile);
         }
     }
 
