@@ -73,7 +73,7 @@ public class Game {
         }
         if (status != GameStatus.IN_PROGRESS) {
             throw new GameException(
-                    ErrorCode.INVALID_MOVE,
+                    ErrorCode.GAME_NOT_STARTED,
                     "Game not started"
             );
         }
@@ -121,11 +121,11 @@ public class Game {
         if (!currentPlayerUUID.equals(playerId)) {
             throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
         }
-        if (turnState.isTilesPlaced()) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "You already placed the tiles");
-        }
         if (status != GameStatus.WAITING_FOR_PLACEMENT) {
             throw new GameException(ErrorCode.INVALID_MOVE, "You must draw tiles first");
+        }
+        if (turnState.isTilesPlaced()) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "You already placed the tiles");
         }
         if (tilePlacements.size() != tilesToPlace.size()) {
             throw new GameException(ErrorCode.INVALID_MOVE, "You must place all tiles");
@@ -211,8 +211,14 @@ public class Game {
         tilesToPlace = null;
     }
 
-
     public void placeAnimalCube(UUID playerId, Position position, AnimalType animalType) {
+        if (status != GameStatus.IN_PROGRESS) {
+            throw new GameException(
+                    ErrorCode.GAME_NOT_STARTED,
+                    "Game not started"
+            );
+        }
+
         Player player = getPlayerById(playerId);
         AnimalCard card = player.getAnimalCards().stream()
                 .filter(c -> c.getType() == animalType)
@@ -220,7 +226,7 @@ public class Game {
                 .orElseThrow(() -> new GameException(ErrorCode.INVALID_MOVE, "Animal card not found"));
 
         Board board = boards.get(playerId);
-        board.placeAnimalCube(position, animalType, animalDeck);
+        board.placeAnimalCube(position, animalType, centralBoard);
         card.incrementPlacedCubes();
 
         turnState.placeAnimalCube();
@@ -259,6 +265,13 @@ public class Game {
      * Method that allows the actual player turn to end to move to the other
      */
     public void nextTurn() {
+        if (status != GameStatus.IN_PROGRESS) {
+            throw new GameException(
+                    ErrorCode.GAME_NOT_STARTED,
+                    "Game not started"
+            );
+        }
+
         // Find actual index player
         int currentIndex = -1;
         for (int i = 0; i < players.size(); i++) {
@@ -290,6 +303,21 @@ public class Game {
      * @throws GameException If the player is not found, or if the player already has 4 animal cards.
      */
     public void takeAnimalCard(UUID playerId, AnimalType animalType) {
+        // Checks
+        if (status != GameStatus.IN_PROGRESS) {
+            throw new GameException(
+                    ErrorCode.GAME_NOT_STARTED,
+                    "Game not started"
+            );
+        }
+        if (!EnumSet.allOf(AnimalType.class).contains(animalType)) {
+            throw new GameException(
+                    ErrorCode.INVALID_MOVE,
+                    "Unknown animal type: " + animalType
+            );
+        }
+
+
         Player player = getPlayerById(playerId);
 
         if (player.getAnimalCards().size() >= 4) {

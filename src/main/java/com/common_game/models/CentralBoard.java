@@ -2,14 +2,19 @@ package com.common_game.models;
 
 import com.common_game.decks.TerrainDeck;
 import com.enums.TerrainType;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+@Getter
+@Setter
 public class CentralBoard {
     private final Map<Integer, List<TerrainTile>> slots; // 5 emplacements (1 à 5)
     private final TerrainDeck deck;
+    private Integer nbOfAnimalCubeLeft;
 
     public CentralBoard(TerrainDeck deck) {
         this.deck = deck;
@@ -17,6 +22,7 @@ public class CentralBoard {
         for (int i = 1; i <= 5; i++) {
             slots.put(i, drawInitialTiles());
         }
+        this.nbOfAnimalCubeLeft = 60;
     }
 
     /**

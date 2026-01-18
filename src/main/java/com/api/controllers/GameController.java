@@ -199,8 +199,11 @@ public class GameController {
         response.setCurrentPlayerUUID(game.getCurrentPlayerUUID());
         response.setNbOfAnimalCardsLeft(game.getAnimalDeck().getAnimalCards().size());
         response.setNbOfTileLeft(game.getTerrainDeck().getTiles().size());
+        response.setNbOfAnimalCubeLeft(game.getCentralBoard().getNbOfAnimalCubeLeft());
         return response;
     }
+
+    // -------- Helper --------
 
     private Game getGameOrThrow(UUID gameId) {
         return gameStorage.findById(gameId)

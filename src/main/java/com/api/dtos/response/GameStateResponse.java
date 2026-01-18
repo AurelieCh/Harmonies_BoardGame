@@ -17,4 +17,5 @@ public class GameStateResponse {
     private UUID currentPlayerUUID;
     private Integer nbOfAnimalCardsLeft;
     private Integer nbOfTileLeft;
+    private Integer nbOfAnimalCubeLeft;
 }

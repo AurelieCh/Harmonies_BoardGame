@@ -16,7 +16,7 @@ import java.util.Stack;
 public class Cell {
     private final Position position;
     private final Stack<TerrainTile> stack = new Stack<>(); // Tiles pile (max 3)
-    private AnimalType animal; // Animal cube (null if empty)
+    private AnimalType animalCube; // Animal cube (null if empty)
 
     public Cell(Position position) {
         this.position = position;
@@ -46,5 +46,9 @@ public class Cell {
 
     public boolean isEmpty() {
         return stack.isEmpty();
+    }
+
+    public boolean hasAnimalCube() {
+        return animalCube != null;
     }
 }

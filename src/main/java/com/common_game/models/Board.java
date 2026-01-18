@@ -1,8 +1,6 @@
 package com.common_game.models;
 
-import com.common_game.decks.AnimalDeck;
 import com.common_game.decks.Position;
-import com.common_game.rules.AnimalHabitatValidator;
 import com.enums.AnimalType;
 import com.enums.ErrorCode;
 import com.enums.TerrainType;
@@ -19,7 +17,6 @@ import java.util.stream.Collectors;
 public class Board {
     private Map<Position, Cell> cells;
     private final WaterFaceType waterFaceType;
-    private final Map<Position, AnimalType> animalCubes = new HashMap<>(); // Animal cubes placed
     public static final int BOARD_SIZE = 5;
 
     public Board(WaterFaceType waterFaceType) {
@@ -58,17 +55,29 @@ public class Board {
         }
     }
 
-    public void placeAnimalCube(Position position, AnimalType animalType, AnimalDeck animalDeck) {
+    public void placeAnimalCube(Position position, AnimalType animalType, CentralBoard centralBoard) {
         Cell cell = cells.get(position);
-        if (cell.isEmpty() || cell.getAnimal() != null) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "Cannot place animal here");
+
+        if (cell == null) {
+            throw new GameException(ErrorCode.INVALID_POSITION, "Invalid position");
         }
 
-        if (!AnimalHabitatValidator.isHabitatValid(this, position, animalType, animalDeck)) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "Habitat rule not satisfied for " + animalType);
+        if (cell.isEmpty()) {
+            throw new GameException(
+                    ErrorCode.INVALID_MOVE,
+                    "Cannot place animal cube on an empty cell"
+            );
         }
 
-        cell.setAnimal(animalType);
+        if (cell.getAnimalCube() != null) {
+            throw new GameException(
+                    ErrorCode.INVALID_MOVE,
+                    "Cell already contains an animal cube"
+            );
+        }
+
+        centralBoard.setNbOfAnimalCubeLeft(centralBoard.getNbOfAnimalCubeLeft()-1);
+        cell.setAnimalCube(animalType);
     }
 
     public TerrainTile getTopTile(Position position) {
@@ -82,6 +91,28 @@ public class Board {
                 .count();
     }
 
+    /**
+     * Retourne le nombre total de cubes d'un type animal placé sur le plateau.
+     * @param animalType le type d'animal
+     * @return nombre de cubes placés
+     */
+    public int getAnimalCubeCount(AnimalType animalType) {
+        return (int) cells.values().stream()
+                .filter(cell -> cell.getAnimalCube() == animalType)
+                .count();
+    }
+
+    /**
+     * Retourne toutes les positions où au moins un cube du type animal est placé.
+     * @param animalType le type d'animal
+     * @return liste des positions
+     */
+    public List<Position> getPositionsWithAnimal(AnimalType animalType) {
+        return cells.entrySet().stream()
+                .filter(e -> e.getValue().getAnimalCube() == animalType)
+                .map(Map.Entry::getKey)
+                .toList();
+    }
 
     // =============================================
     // Methods to calculate points by landscapes
@@ -386,8 +417,8 @@ public class Board {
                         TerrainTile tile = cell.getStack().get(level - 1);
                         String tileSymbol = getTileSymbol(tile.getType());
                         String animalSymbol =
-                                (level == 3 && cell.getAnimal() != null)
-                                        ? getAnimalSymbol(cell.getAnimal())
+                                (level == 3 && cell.getAnimalCube() != null)
+                                        ? getAnimalSymbol(cell.getAnimalCube())
                                         : " ";
                         sb.append("[").append(tileSymbol).append(animalSymbol).append("]");
                     } else {
@@ -426,7 +457,7 @@ public class Board {
             case MOLE -> "🐾"; case DRAGONFLY -> "🪲"; case LADYBUG -> "🐞";
             case ANT -> "🐜"; case SALMON -> "🐟"; case EAGLE -> "🦅";
             case RACCOON -> "🦝";
-            default -> "🐾";
+            default -> type.name();
         };
     }
 }
