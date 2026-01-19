@@ -1,8 +1,8 @@
 package com.common_game.cards;
 
 import com.common_game.models.Board;
+import com.common_game.rules.AnimalRequirement;
 import com.common_game.rules.AnimalScoringRule;
-import com.common_game.rules.TerrainRequirement;
 import com.enums.AnimalType;
 import lombok.Getter;
 
@@ -18,17 +18,17 @@ public class AnimalCard {
     private final int points;
     private final int cubeCount;
     private final AnimalScoringRule scoringRule;
-    private final List<TerrainRequirement> terrainRequirements;
+    private final List<AnimalRequirement> animalRequirements;
     private int placedCubes;
 
     public AnimalCard(UUID id, AnimalType type, int points, int cubeCount,
-                      AnimalScoringRule scoringRule, List<TerrainRequirement> terrainRequirements) {
+                      AnimalScoringRule scoringRule, List<AnimalRequirement> animalRequirements) {
         this.id = id;
         this.type = type;
         this.points = points;
         this.cubeCount = cubeCount;
         this.scoringRule = scoringRule;
-        this.terrainRequirements = terrainRequirements;
+        this.animalRequirements = animalRequirements;
         this.placedCubes = 0;
     }
 

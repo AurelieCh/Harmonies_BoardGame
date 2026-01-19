@@ -24,4 +24,8 @@ public record Position(int x, int y) {
                 new Position(x, y - 1)
         );
     }
+
+    public Position add(Position other) {
+        return new Position(this.x + other.x(), this.y + other.y());
+    }
 }

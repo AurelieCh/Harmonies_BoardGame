@@ -3,11 +3,13 @@ package com.common_game.models;
 import com.common_game.decks.Position;
 import com.enums.AnimalType;
 import com.enums.ErrorCode;
+import com.enums.TerrainType;
 import com.exceptions.GameException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
 import java.util.Stack;
 
 @Getter
@@ -51,4 +53,11 @@ public class Cell {
     public boolean hasAnimalCube() {
         return animalCube != null;
     }
+
+    public List<TerrainType> getStackSignature() {
+        return stack.stream()
+                .map(TerrainTile::getType)
+                .toList();
+    }
+
 }

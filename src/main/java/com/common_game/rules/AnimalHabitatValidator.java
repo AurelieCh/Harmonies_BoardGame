@@ -5,34 +5,62 @@ import com.common_game.decks.Position;
 import com.common_game.models.Board;
 import com.common_game.models.Cell;
 import com.enums.ErrorCode;
+import com.enums.TerrainType;
 import com.exceptions.GameException;
 
-import java.util.Objects;
+import java.util.List;
 
 public class AnimalHabitatValidator {
 
-    /**
-     * Vérifie si l'animal peut être posé à la position donnée selon ses requirements
-     */
-    public static void assertCanPlaceAnimal(Board board, Position position, AnimalCard card) {
-        for (TerrainRequirement req : card.getTerrainRequirements()) {
-            int count;
-            if (req.adjacent()) {
-                // Vérifie les tuiles adjacentes à la cellule cible
-                count = (int) position.adjacent().stream()
-                        .map(board.getCells()::get)
-                        .filter(Objects::nonNull)
-                        .filter(c -> !c.isEmpty() && c.getTopTile().getType() == req.terrainType())
-                        .count();
-            } else {
-                // Vérifie la tuile cible elle-même
-                Cell targetCell = board.getCells().get(position);
-                count = (!targetCell.isEmpty() && targetCell.getTopTile().getType() == req.terrainType()) ? 1 : 0;
+    public static void assertCanPlaceAnimal(Board board, Position target, AnimalCard card) {
+
+        for (AnimalRequirement req : card.getAnimalRequirements()) {
+
+            Position cubeRelativePos = req.relativePositions().get(req.placeCubeAt());
+            Position expectedCubePos = target.add(cubeRelativePos);
+
+            if (!expectedCubePos.equals(target)) {
+                throw new GameException(
+                        ErrorCode.INVALID_MOVE,
+                        "Animal must be placed at the correct motif position"
+                );
             }
-            if (count < req.count()) {
-                throw new GameException(ErrorCode.INVALID_MOVE,
-                        "Cannot place " + card.getType() + ": habitat requirement not satisfied");
+
+            for (int i = 0; i < req.relativePositions().size(); i++) {
+
+                Position absolutePos = target.add(req.relativePositions().get(i));
+                Cell cell = board.getCells().get(absolutePos);
+
+                if (cell == null) {
+                    throw new GameException(
+                            ErrorCode.INVALID_MOVE,
+                            "Motif goes out of board bounds"
+                    );
+                }
+
+                List<TerrainType> actualStack = cell.getStackSignature();
+                List<TerrainType> expectedStack = req.requiredStacks().get(i);
+
+                if (actualStack.size() < expectedStack.size()) {
+                    throw new GameException(ErrorCode.INVALID_MOVE, "Stack too small");
+                }
+
+                for (int h = 0; h < expectedStack.size(); h++) {
+                    if (actualStack.get(h) != expectedStack.get(h)) {
+                        throw new GameException(
+                                ErrorCode.INVALID_MOVE,
+                                "Habitat motif mismatch for " + card.getType()
+                        );
+                    }
+                }
+
             }
+            return;
         }
+
+        throw new GameException(
+                ErrorCode.INVALID_MOVE,
+                "No valid habitat motif found for " + card.getType()
+        );
     }
 }

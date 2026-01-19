@@ -22,7 +22,7 @@ public class CentralBoard {
         for (int i = 1; i <= 5; i++) {
             slots.put(i, drawInitialTiles());
         }
-        this.nbOfAnimalCubeLeft = 60;
+        this.nbOfAnimalCubeLeft = 66;
     }
 
     /**
