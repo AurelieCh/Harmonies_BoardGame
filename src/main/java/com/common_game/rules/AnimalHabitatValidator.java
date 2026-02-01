@@ -12,7 +12,7 @@ import java.util.List;
 
 public class AnimalHabitatValidator {
 
-    public static void assertCanPlaceAnimal(Board board, Position target, AnimalCard card) {
+    public static void isHabitatValid(Board board, Position target, AnimalCard card) {
 
         for (AnimalRequirement req : card.getAnimalRequirements()) {
 

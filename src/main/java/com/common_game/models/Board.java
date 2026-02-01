@@ -3,7 +3,6 @@ package com.common_game.models;
 import com.common_game.cards.AnimalCard;
 import com.common_game.decks.Position;
 import com.common_game.rules.AnimalHabitatValidator;
-import com.common_game.rules.TileRules;
 import com.enums.AnimalType;
 import com.enums.ErrorCode;
 import com.enums.TerrainType;
@@ -20,6 +19,7 @@ import java.util.stream.Collectors;
 public class Board {
     private Map<Position, Cell> cells;
     private final WaterFaceType waterFaceType;
+    private final Map<Position, AnimalType> animalCubes = new HashMap<>(); // Animal cubes placed
     public static final int BOARD_SIZE = 5;
 
     public Board(WaterFaceType waterFaceType) {
@@ -40,35 +40,32 @@ public class Board {
     /**
      * Place a tile at a position, optionally at a specific height (0 = level 1)
      */
-    public void placeTile(Position pos, TerrainTile tile) {
-        Cell cell = cells.computeIfAbsent(pos, Cell::new);
-
-        if (cell.hasAnimalCube()) {
-            throw new GameException(ErrorCode.INVALID_MOVE, "Cannot place tile on a cell with an animal cube");
+    public void placeTile(Position position, TerrainTile tile, Integer height) {
+        Cell cell = cells.get(position);
+        if (cell == null) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "Tile must be within the board range");
         }
 
-        List<TerrainType> currentStack = cell.getStack().stream()
-                .map(TerrainTile::getType)
-                .toList();
-
-        if (TileRules.isPlacementAllowed(currentStack, tile.getType())) {
-            throw new GameException(ErrorCode.INVALID_MOVE,
-                    "Tile " + tile.getType() + " cannot be placed here according to stack rules: " + currentStack);
+        // Default: push on top
+        if (height == null) {
+            cell.addTile(tile);
+        } else {
+            if (height != cell.getHeight()) {
+                throw new GameException(ErrorCode.INVALID_MOVE,
+                        "Cannot place tile at height " + height + ", expected " + cell.getHeight());
+            }
+            cell.addTile(tile);
         }
-
-        cell.addTile(tile);
     }
 
-    public void placeAnimalCube(Position position, AnimalType animalType, CentralBoard centralBoard, AnimalCard card) {
+    public void placeAnimalCube(Position position, AnimalType animalType, AnimalCard card) {
         Cell cell = cells.get(position);
-        if (cell == null) throw new GameException(ErrorCode.INVALID_POSITION, "Invalid position");
-        if (cell.isEmpty()) throw new GameException(ErrorCode.INVALID_MOVE, "Cannot place on empty cell");
-        if (cell.hasAnimalCube()) throw new GameException(ErrorCode.INVALID_MOVE, "Cell already has an animal cube");
+        if (cell.isEmpty() || cell.getAnimalCube() != null) {
+            throw new GameException(ErrorCode.INVALID_MOVE, "Cannot place animal here");
+        }
 
-        AnimalHabitatValidator.assertCanPlaceAnimal(this, position, card);
+        AnimalHabitatValidator.isHabitatValid(this, position, card);
 
-        // placement
-        centralBoard.setNbOfAnimalCubeLeft(centralBoard.getNbOfAnimalCubeLeft() - 1);
         cell.setAnimalCube(animalType);
     }
 
@@ -83,28 +80,6 @@ public class Board {
                 .count();
     }
 
-    /**
-     * Retourne le nombre total de cubes d'un type animal placé sur le plateau.
-     * @param animalType le type d'animal
-     * @return nombre de cubes placés
-     */
-    public int getAnimalCubeCount(AnimalType animalType) {
-        return (int) cells.values().stream()
-                .filter(cell -> cell.getAnimalCube() == animalType)
-                .count();
-    }
-
-    /**
-     * Retourne toutes les positions où au moins un cube du type animal est placé.
-     * @param animalType le type d'animal
-     * @return liste des positions
-     */
-    public List<Position> getPositionsWithAnimal(AnimalType animalType) {
-        return cells.entrySet().stream()
-                .filter(e -> e.getValue().getAnimalCube() == animalType)
-                .map(Map.Entry::getKey)
-                .toList();
-    }
 
     // =============================================
     // Methods to calculate points by landscapes
@@ -372,6 +347,19 @@ public class Board {
                 + calculateBuildingPoints();
     }
 
+    public List<Position> getPositionsWithAnimal(AnimalType animalType) {
+        return cells.entrySet().stream()
+                .filter(e -> e.getValue().getAnimalCube() == animalType)
+                .map(Map.Entry::getKey)
+                .toList();
+    }
+
+    public int getAnimalCubeCount(AnimalType animalType) {
+        return (int) cells.values().stream()
+                .filter(cell -> cell.getAnimalCube() == animalType)
+                .count();
+    }
+
     @Override
     public String toString() {
         if (cells.isEmpty()) {
@@ -384,13 +372,12 @@ public class Board {
         StringBuilder sb = new StringBuilder();
         sb.append("=== Board State (3D) ===\n");
 
-        // Déterminer la hauteur max du plateau
-        int maxLevel = cells.values().stream().mapToInt(Cell::getHeight).max().orElse(0);
-
-        for (int level = 1; level <= maxLevel; level++) {
+        // Pour chaque niveau (stack height)
+        for (int level = 1; level <= 3; level++) {
             sb.append("--- Level ").append(level).append(" ---\n");
 
             for (int y = maxY; y >= minY; y--) {
+
                 final int rowY = y;
 
                 if (rowY % 2 == 1) sb.append("  "); // décalage hex
@@ -403,20 +390,21 @@ public class Board {
                 for (Position pos : rowPositions) {
                     Cell cell = cells.get(pos);
 
+                    // **Ajout debug : afficher la position**
                     sb.append("(").append(pos.x()).append(",").append(pos.y()).append(")");
 
-                    String tileSymbol = "  ";
                     if (cell.getStack().size() >= level) {
-                        tileSymbol = getTileSymbol(cell.getStack().get(level - 1).getType());
+                        TerrainTile tile = cell.getStack().get(level - 1);
+                        String tileSymbol = getTileSymbol(tile.getType());
+                        String animalSymbol =
+                                (level == 3 && cell.getAnimalCube() != null)
+                                        ? getAnimalSymbol(cell.getAnimalCube())
+                                        : " ";
+                        sb.append("[").append(tileSymbol).append(animalSymbol).append("]");
+                    } else {
+                        sb.append("[  ]");
                     }
-
-                    // Affiche l’animal **sur le dernier niveau occupé** seulement
-                    String animalSymbol = " ";
-                    if (cell.hasAnimalCube() && level == cell.getHeight()) {
-                        animalSymbol = getAnimalSymbol(cell.getAnimalCube());
-                    }
-
-                    sb.append("[").append(tileSymbol).append(animalSymbol).append("] ");
+                    sb.append(" "); // petit espace pour séparer les cases
                 }
                 sb.append("\n");
             }
@@ -440,38 +428,12 @@ public class Board {
     private String getAnimalSymbol(AnimalType type) {
         if (type == null) return "";
         return switch (type) {
-            case DEER -> "🦌";
-            case FOX -> "🦊";
-            case WOLF -> "🐺";
-            case FISH -> "🐟";
-            case BAT -> "🦇";
-            case HEDGEHOG -> "🦔";
-            case BEAVER -> "🦫";
-            case OTTER -> "🦦";
-            case RABBIT -> "🐇";
-            case FROG -> "🐸";
-            case SQUIRREL -> "🐿️";
-            case HAWK -> "🦅";
-            case OWL -> "🦉";
-            case TURTLE -> "🐢";
-            case EAGLE -> "🦅";
-            case RACCOON -> "🦝";
-            case MOUSE -> "🐁";
-            case BEAR -> "🐻";
-            case DUCK -> "🦆";
-            case SWAN -> "🦢";
-            case HORSE -> "🐴";
-            case COW -> "🐄";
-            case SHEEP -> "🐑";
-            case CAT -> "🐈";
-            case DOG -> "🐕";
-            case RAVEN -> "🐦";
-            case CHICKEN -> "🐔";
-            case SHEEPDOG -> "🐕‍🦺";
-            case GOAT -> "🐐";
-            case CRANE -> "🦩";
-            case PIG -> "🐖";
-            case TURKEY -> "🦃";
+            case DEER -> "🦌"; case FOX -> "🦊"; case FISH -> "🐟";
+            case BAT -> "🦇"; case HEDGEHOG -> "🦔"; case BEAVER -> "🦫";
+            case OTTER -> "🦦"; case RABBIT -> "🐇"; case FROG -> "🐸";
+            case SQUIRREL -> "🐿"; case HAWK -> "🦅"; case OWL -> "🦉";
+            case TURTLE -> "🐢"; case EAGLE -> "🦅"; case RACCOON -> "🦝";
+            default -> "🐾";
         };
     }
 }

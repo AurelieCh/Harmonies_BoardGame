@@ -198,7 +198,7 @@ public class Game {
     private void placeTilesOnBoard(Board board, List<TilesPlacementRequest> sortedTiles) {
         for (TilesPlacementRequest placement : sortedTiles) {
             TerrainTile tile = new TerrainTile(placement.getTerrainType());
-            board.placeTile(placement.getPosition(), tile);
+            board.placeTile(placement.getPosition(), tile, placement.getHeight());
         }
     }
 
@@ -231,7 +231,7 @@ public class Game {
                 .orElseThrow(() -> new GameException(ErrorCode.INVALID_MOVE, "Animal card not found"));
 
         Board board = boards.get(playerId);
-        board.placeAnimalCube(position, animalType, centralBoard, card);
+        board.placeAnimalCube(position, animalType, card);
         card.incrementPlacedCubes();
 
         turnState.placeAnimalCube();
